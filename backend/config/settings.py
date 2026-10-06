@@ -134,8 +134,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --------------------------------------------------------------------------
 # CORS / CSRF
 # --------------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = True
-CSRF_TRUSTED_ORIGINS = True
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173" if DEBUG else ""
+)
+CORS_ALLOWED_ORIGINS += ["https://dcinstallapp-fronend.onrender.com"]
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS += ["https://dcinstallapp-fronend.onrender.com"]
+
+print("CORS_ALLOWED_ORIGINS =", CORS_ALLOWED_ORIGINS, flush=True)
 
 # --------------------------------------------------------------------------
 # Seguridad en producción (Render termina TLS en su proxy)
