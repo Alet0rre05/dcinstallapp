@@ -195,7 +195,7 @@ AXES_LOCKOUT_PARAMETERS = ["ip_address"]
 AXES_RESET_ON_SUCCESS = True
 AXES_IPWARE_META_PRECEDENCE_ORDER = ["HTTP_X_FORWARDED_FOR", "REMOTE_ADDR"]
 AXES_IPWARE_PROXY_COUNT = int(os.environ.get("NUM_PROXIES", "1"))
-AXES_ENABLED = env_bool("AXES_ENABLED", True)
+AXES_ENABLED = env_bool("AXES_ENABLED",false)
 
 # --------------------------------------------------------------------------
 # Cloudflare Turnstile (la clave secreta SOLO por variable de entorno)
