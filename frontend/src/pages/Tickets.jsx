@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
+import EstadoVacio from "../lib/EstadoVacio.jsx";
+import { ListaSkeleton } from "../lib/Skeleton.jsx";
 
 function Chat({ ticket, onChange }) {
   const { user } = useAuth();
@@ -111,7 +113,7 @@ export default function Tickets() {
         <button className="btn">Crear ticket</button>
       </form>
 
-      {!data ? <p>Cargando…</p> : (
+      {!data ? <ListaSkeleton filas={3} alto="h-14" /> : (
         <>
           <ul className="space-y-3">
             {data.results.map((t) => (
@@ -124,7 +126,7 @@ export default function Tickets() {
                 {abierto === t.id && <Chat ticket={t} onChange={cargar} />}
               </li>
             ))}
-            {data.results.length === 0 && <p className="text-slate-500">No hay tickets.</p>}
+            {data.results.length === 0 && <EstadoVacio titulo="No hay tickets">Cuando abras un pedido de soporte lo vas a ver acá.</EstadoVacio>}
           </ul>
           <div className="mt-4 flex items-center justify-center gap-3 text-sm">
             <button className="btn-sec" disabled={!data.previous} onClick={() => setPagina(pagina - 1)}>Anterior</button>

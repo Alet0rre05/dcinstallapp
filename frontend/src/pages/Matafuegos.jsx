@@ -4,6 +4,9 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import Combobox from "../lib/Combobox.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
+import EstadoVacio from "../lib/EstadoVacio.jsx";
+import RevisionBadge from "../lib/RevisionBadge.jsx";
+import { FichaSkeleton, ListaSkeleton } from "../lib/Skeleton.jsx";
 import FichaMatafuego from "../lib/FichaMatafuego.jsx";
 
 // FormControl vive ahora en lib/; se re-exporta para no romper imports viejos.
@@ -69,10 +72,10 @@ function TarjetaCliente({ c, onAbrir }) {
     <li>
       <button
         onClick={() => onAbrir(c.id)}
-        className="card flex min-h-[72px] w-full items-center gap-3 text-left hover:bg-slate-50"
+        className="card flex min-h-[72px] w-full items-center gap-3 text-left hover:border-brand-dark hover:bg-brand-light active:bg-brand/30"
       >
         <span className="mr-auto">
-          <span className="block text-lg font-semibold">{c.nombre}</span>
+          <span className="block text-lg font-semibold text-ink">{c.nombre}</span>
           <span className="block text-base text-slate-600">{c.total} {c.total === 1 ? "equipo" : "equipos"}</span>
           {c.vencidos_criticos > 0 && (
             <span className="mt-1 block text-base font-semibold text-red-700">
@@ -83,6 +86,17 @@ function TarjetaCliente({ c, onAbrir }) {
             <span className="block text-base font-semibold text-yellow-700">
               ● {c.por_vencer} por vencer
             </span>
+          )}
+          {c.total > 0 && (
+            c.sin_revisar > 0 ? (
+              <span className="mt-1 block text-base font-semibold text-brand-dark">
+                <span aria-hidden="true">○</span> {c.sin_revisar} sin revisar este mes
+              </span>
+            ) : (
+              <span className="mt-1 block text-base font-semibold text-brand-dark">
+                <span aria-hidden="true">✓</span> Todo revisado este mes
+              </span>
+            )
           )}
         </span>
         <span aria-hidden="true" className="text-2xl text-slate-400">›</span>
@@ -166,16 +180,25 @@ export default function Matafuegos() {
       </div>
     );
   }
-  if (!resumen) return <p>Cargando…</p>;
+  if (!resumen) {
+    return (
+      <div>
+        <h1 className="mb-3 text-2xl font-bold text-ink">Elegí un cliente</h1>
+        <ListaSkeleton filas={3} alto="h-[88px]" />
+      </div>
+    );
+  }
 
   // -- Paso 1: lista de clientes -------------------------------------------
   if (!cliente) {
     return (
       <div>
-        <h1 className="mb-1 text-xl font-bold">Elegí un cliente</h1>
-        <p className="mb-3 text-base text-slate-600">Tocá el cliente para ver sus matafuegos.</p>
+        <h1 className="mb-1 text-2xl font-bold text-ink">Elegí un cliente</h1>
+        <p className="mb-4 text-base text-slate-600">Tocá el cliente para ver sus matafuegos.</p>
         {resumen.length === 0 && (
-          <p className="text-slate-500">Todavía no tenés clientes asignados. Pedile a la oficina que te asigne uno.</p>
+          <EstadoVacio titulo="Todavía no tenés clientes asignados">
+            Pedile a la oficina que te asigne uno.
+          </EstadoVacio>
         )}
         <ul className="space-y-3">
           {resumen.map((c) => <TarjetaCliente key={c.id} c={c} onAbrir={abrirCliente} />)}
@@ -189,7 +212,7 @@ export default function Matafuegos() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn-sec min-h-[44px]" onClick={volver}>← Clientes</button>
-        <h1 className="mr-auto text-xl font-bold">{cliente.nombre}</h1>
+        <h1 className="mr-auto text-2xl font-bold text-ink">{cliente.nombre}</h1>
         {esStaff && (
           <label className="flex min-h-[44px] items-center gap-2 text-base">
             <input type="checkbox" className="h-5 w-5" checked={verBajas} onChange={(e) => setVerBajas(e.target.checked)} /> Ver bajas
@@ -217,9 +240,11 @@ export default function Matafuegos() {
           {error} <button className="underline" onClick={refrescar}>Reintentar</button>
         </p>
       )}
-      {!equipos && !error && <p>Cargando equipos…</p>}
+      {!equipos && !error && <ListaSkeleton filas={2} alto="h-14" />}
       {equipos && equipos.length === 0 && (
-        <p className="text-slate-500">Este cliente todavía no tiene matafuegos cargados.</p>
+        <EstadoVacio titulo="Este cliente todavía no tiene matafuegos cargados">
+          {esStaff ? "Usá “+ Agregar matafuego” o importá una planilla de Excel." : "Cuando la oficina los cargue, los vas a ver acá."}
+        </EstadoVacio>
       )}
       {equipos && equipos.length > 0 && (
         <Combobox
@@ -233,19 +258,22 @@ export default function Matafuegos() {
           inputLabel={(m) => `N° ${m.numero_serie}${m.ubicacion ? ` · ${m.ubicacion}` : ""}`}
           onSelect={elegirEquipo}
           renderItem={(m) => (
-            <span className="flex items-center gap-3">
-              <span className="mr-auto min-w-0">
+            // Celular: fila 1 = revisión (izq.) + semáforo (der.); fila 2 = datos. Desde sm: todo en una fila.
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 sm:flex-nowrap">
+              <span className="order-1"><RevisionBadge revisado={m.revisado_mes} /></span>
+              <span className="order-3 w-full min-w-0 sm:order-2 sm:w-auto sm:flex-1">
                 <span className="block text-base font-semibold">
                   N° {m.numero_serie} {!m.activo && <span className="rounded bg-slate-200 px-1 text-xs font-normal">BAJA</span>}
                 </span>
                 <span className="block truncate text-sm text-slate-600">{m.ubicacion || "Sin ubicación"}</span>
               </span>
-              <EstadoBadge estado={m.estado_color} />
+              <span className="order-2 ml-auto sm:order-3"><EstadoBadge estado={m.estado_color} /></span>
             </span>
           )}
         />
       )}
 
+      {equipoParam && !equipos && !error && <FichaSkeleton />}
       {elegido && (
         <FichaMatafuego
           key={elegido.id}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.jsx";
+import Logo from "../lib/Logo.jsx";
 
 export default function Login() {
   const { login } = useAuth();
@@ -29,13 +30,16 @@ export default function Login() {
   };
 
   return (
-    <form onSubmit={enviar} className="card mx-auto mt-10 max-w-sm space-y-3">
-      <h1 className="text-xl font-bold">Ingresar</h1>
-      <input className="input" placeholder="Usuario" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
-      <input className="input" type="password" placeholder="Contraseña" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required />
+    <div className="mx-auto mt-4 max-w-sm sm:mt-10">
+    <Logo className="mx-auto mb-5 h-12 w-auto" />
+    <form onSubmit={enviar} className="card space-y-3">
+      <h1 className="text-2xl font-bold text-ink">Ingresar</h1>
+      <input className="input min-h-[44px]" autoComplete="username" placeholder="Usuario" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
+      <input className="input min-h-[44px]" autoComplete="current-password" type="password" placeholder="Contraseña" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="btn w-full" disabled={busy}>{busy ? "Ingresando…" : "Ingresar"}</button>
-      <p className="text-sm">¿No tenés cuenta? <Link className="text-brand underline" to="/registro">Registrate</Link></p>
+      <button className="btn min-h-[44px] w-full" disabled={busy}>{busy ? "Ingresando…" : "Ingresar"}</button>
+      <p className="text-base">¿No tenés cuenta? <Link className="link" to="/registro">Registrate</Link></p>
     </form>
+    </div>
   );
 }

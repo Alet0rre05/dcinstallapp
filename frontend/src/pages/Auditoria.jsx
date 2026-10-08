@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import EstadoVacio from "../lib/EstadoVacio.jsx";
+import { ListaSkeleton } from "../lib/Skeleton.jsx";
 import { fechaHora } from "../lib/fmt.js";
 
 const ACCIONES = [
@@ -60,9 +62,9 @@ export default function Auditoria() {
         <input className="input" type="date" value={f.hasta} onChange={set("hasta")} aria-label="Hasta" />
       </div>
       {error && <p className="text-red-600">{error}</p>}
-      {!data ? <p>Cargando…</p> : (
+      {!data ? <ListaSkeleton filas={4} alto="h-12" /> : (
         <>
-          {data.results.length === 0 && <p className="text-slate-500">No hay eventos para mostrar.</p>}
+          {data.results.length === 0 && <EstadoVacio titulo="No hay eventos para mostrar">Probá cambiar o limpiar los filtros.</EstadoVacio>}
           <ul className="space-y-2">
             {data.results.map((e) => (
               <li key={e.id} className="card cursor-pointer text-sm" onClick={() => setAbierto(abierto === e.id ? null : e.id)}>
