@@ -58,6 +58,23 @@ Cada matafuego tiene un `token_qr` (UUID inmutable). El QR apunta a `/qr/<token>
 - Con rol y cliente asignado: la misma ficha con **Nuevo control** (todos los roles) y **Editar ficha** (OFICINA/ADMIN).
 - Los controles son inmutables y actualizan ubicación/vencimientos del matafuego.
 
+## V2.3
+
+Novedades de la versión 2.3.0 (detalle en [CHANGELOG.md](CHANGELOG.md)).
+
+### Estado REVISADO / NO REVISADO
+En la lista de equipos de cada cliente (a la izquierda) y en la ficha se muestra un estado de **revisión mensual**, independiente del semáforo de colores:
+
+- **REVISADO**: el equipo tiene al menos un control hecho **en el mes calendario actual** (hora de Buenos Aires). Cuenta cualquier control, aunque detecte problemas: significa que un operario fue y lo inspeccionó; cómo está el equipo lo sigue diciendo el semáforo.
+- **NO REVISADO**: todavía no tiene controles este mes.
+- **Se reinicia solo el día 1 de cada mes**: no se guarda ningún dato ni hay tareas programadas; `Matafuego.revisado_mes` se calcula en cada consulta comparando la fecha de los controles con el mes actual. Por eso no hay migraciones y no depende de que el servidor esté despierto a medianoche.
+- La fecha del control la pone el servidor (`ControlSerializer` la tiene de solo lectura), así que no se puede falsear una revisión.
+- Los equipos dados de baja no entran en los conteos. `GET /api/clientes/resumen/` suma `sin_revisar` por cliente.
+- La vista pública del QR no muestra este estado.
+
+### Diseño
+Paleta celeste `#64DCF4` (barra superior y Panel de Control), logo de DC INSTALL, favicon con el pez y menú responsive. Los archivos están en `frontend/public/`.
+
 ## V2.2
 
 Novedades de la versión 2.2.0 (detalle en [CHANGELOG.md](CHANGELOG.md)).
