@@ -1,6 +1,8 @@
 import io
 import zipfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from datetime import timezone as dt_timezone
+from zoneinfo import ZoneInfo
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -866,3 +868,201 @@ class QRClienteNoAsignadoTests(TestCase):
         self.assertEqual(self.api.get(f"/api/public/qr/{self.propio.token_qr}/").status_code, 200)
         self.api.force_authenticate(self.publico)
         self.assertEqual(self.privado(self.propio).status_code, 403)
+
+
+# ---------------------------------------------------------------------------
+# V2.3 · Estado REVISADO / NO REVISADO (calculado por mes calendario, hora Argentina)
+# ---------------------------------------------------------------------------
+ART = ZoneInfo("America/Argentina/Buenos_Aires")
+
+
+def art(y, mes, d, h=12, mi=0):
+    return datetime(y, mes, d, h, mi, tzinfo=ART)
+
+
+def reloj(momento):
+    """Fija 'ahora' (timezone.now y por lo tanto localdate/localtime) sin dependencias extra."""
+    return mock.patch("django.utils.timezone.now", return_value=momento)
+
+
+@override_settings(AXES_ENABLED=False, SECURE_SSL_REDIRECT=False)
+class RevisionMensualTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.a = Cliente.objects.create(nombre="A")
+        self.admin = User.objects.create_superuser("admin", "admin@x.com", "Clave-Segura-123")
+        self.operario = User.objects.create_user("ope", "ope@x.com", "Clave-Segura-123")
+        self.operario.perfil.rol = Rol.OPERARIO
+        self.operario.perfil.save()
+        self.operario.perfil.clientes.set([self.a])
+        self.oficina = User.objects.create_user("ofi", "ofi@x.com", "Clave-Segura-123")
+        self.oficina.perfil.rol = Rol.OFICINA
+        self.oficina.perfil.save()
+        self.oficina.perfil.clientes.set([self.a])
+
+    def control(self, m, fecha=None, **kw):
+        if fecha is not None:
+            kw["fecha"] = fecha
+        return Control.objects.create(matafuego=m, usuario=self.admin, **kw)
+
+    def revisado(self, m):
+        # Igual que las vistas: con prefetch_related("controles")
+        return Matafuego.objects.prefetch_related("controles").get(pk=m.pk).revisado_mes
+
+    # -- Regla básica -------------------------------------------------------
+    def test_sin_controles_no_esta_revisado(self):
+        self.assertFalse(self.revisado(mata(self.a)))
+
+    def test_control_de_este_mes_esta_revisado(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 10, 3))
+        with reloj(art(2026, 10, 15)):
+            self.assertTrue(self.revisado(m))
+
+    def test_control_del_mes_anterior_no_cuenta(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 9, 20))
+        with reloj(art(2026, 10, 15)):
+            self.assertFalse(self.revisado(m))
+
+    def test_mismo_mes_de_otro_anio_no_cuenta(self):
+        m = mata(self.a)
+        self.control(m, art(2025, 10, 15))
+        with reloj(art(2026, 10, 15)):
+            self.assertFalse(self.revisado(m))
+
+    def test_cambio_de_mes_reinicia_solo(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 10, 31, 10, 0))
+        with reloj(art(2026, 10, 31, 18, 0)):
+            self.assertTrue(self.revisado(m))
+        with reloj(art(2026, 11, 1, 9, 0)):  # avanza el reloj al día 1
+            self.assertFalse(self.revisado(m))
+
+    def test_un_control_nuevo_en_el_mes_nuevo_vuelve_a_revisar(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 10, 31, 10, 0))
+        self.control(m, art(2026, 11, 2, 10, 0))
+        with reloj(art(2026, 11, 5)):
+            self.assertTrue(self.revisado(m))
+
+    # -- Borde horario (Argentina es UTC-3) ----------------------------------------
+    def test_borde_horario_fin_de_mes_usa_hora_argentina(self):
+        # 31/10 23:30 ART == 01/11 02:30 UTC
+        m = mata(self.a)
+        f = art(2026, 10, 31, 23, 30)
+        self.assertEqual(f.astimezone(dt_timezone.utc).month, 11)  # en UTC ya es noviembre
+        self.control(m, f)
+        with reloj(art(2026, 10, 31, 23, 45)):  # en UTC también es 01/11
+            self.assertTrue(self.revisado(m))
+        with reloj(art(2026, 11, 1, 0, 10)):  # recién acá empieza noviembre en Argentina
+            self.assertFalse(self.revisado(m))
+
+    def test_borde_horario_control_de_septiembre_noche_no_cuenta_en_octubre(self):
+        # 30/09 22:00 ART == 01/10 01:00 UTC: para Argentina sigue siendo septiembre
+        m = mata(self.a)
+        self.control(m, art(2026, 9, 30, 22, 0))
+        with reloj(art(2026, 10, 5)):
+            self.assertFalse(self.revisado(m))
+
+    # -- Independiente del semáforo ------------------------------------------------
+    def test_control_con_problemas_cuenta_como_revision_y_no_cambia_el_semaforo(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 10, 3), presion=Control.Presion.BAJA)
+        with reloj(art(2026, 10, 15)):
+            fresco = Matafuego.objects.prefetch_related("controles").get(pk=m.pk)
+            self.assertTrue(fresco.revisado_mes)
+            self.assertEqual(fresco.estado_color, "ROJO")  # el semáforo sigue diciendo el estado
+
+    def test_operativo_y_no_revisado_a_la_vez(self):
+        m = mata(self.a)
+        self.control(m, art(2026, 9, 10))
+        with reloj(art(2026, 10, 15)):
+            fresco = Matafuego.objects.prefetch_related("controles").get(pk=m.pk)
+            self.assertEqual(fresco.estado_color, "VERDE")
+            self.assertFalse(fresco.revisado_mes)
+
+    # -- API -----------------------------------------------------------------------
+    def listar(self, user):
+        self.api.force_authenticate(user)
+        r = self.api.get(f"/api/matafuegos/?cliente={self.a.id}")
+        self.assertEqual(r.status_code, 200)
+        return {x["id"]: x for x in r.json()["results"]}
+
+    def test_crear_control_por_api_deja_el_equipo_revisado(self):
+        m = mata(self.a)
+        self.assertFalse(self.listar(self.operario)[m.id]["revisado_mes"])
+        r = self.api.post("/api/controles/", {"matafuego": m.id, "presion": "NORMAL"}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertTrue(self.listar(self.operario)[m.id]["revisado_mes"])
+
+    def test_la_fecha_del_control_no_se_puede_falsear_por_api(self):
+        m = mata(self.a)
+        self.api.force_authenticate(self.operario)
+        vieja = "2020-01-01T10:00:00-03:00"
+        r = self.api.post(
+            "/api/controles/", {"matafuego": m.id, "fecha": vieja}, format="json"
+        )
+        self.assertEqual(r.status_code, 201, r.content)
+        # el servidor ignora la fecha enviada y pone la actual
+        self.assertTrue(Control.objects.get(pk=r.json()["id"]).fecha.year >= 2026)
+        self.assertTrue(self.listar(self.operario)[m.id]["revisado_mes"])
+
+    def test_qr_publico_no_expone_revisado_mes(self):
+        m = mata(self.a)
+        self.control(m)
+        r = self.api.get(f"/api/public/qr/{m.token_qr}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("revisado_mes", r.json())
+
+    def test_qr_privado_si_incluye_revisado_mes(self):
+        m = mata(self.a)
+        self.api.force_authenticate(self.operario)
+        r = self.api.get(f"/api/matafuegos/qr/{m.token_qr}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("revisado_mes", r.json())
+
+    def test_listado_no_hace_consultas_por_equipo(self):
+        def consultas():
+            self.api.force_authenticate(self.oficina)
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.api.get(f"/api/matafuegos/?cliente={self.a.id}").status_code, 200)
+            return len(ctx)
+
+        for i in range(3):
+            self.control(mata(self.a, f"P{i}"))
+        pocas = consultas()
+        for i in range(40):
+            self.control(mata(self.a, f"G{i}"))
+            mata(self.a, f"H{i}")  # sin controles
+        self.assertEqual(consultas(), pocas)
+
+    # -- Resumen por cliente (sin_revisar) ----------------------------------------------
+    def test_resumen_cuenta_sin_revisar_solo_activos(self):
+        revisado, viejo, nunca = mata(self.a, "R"), mata(self.a, "V"), mata(self.a, "N")
+        baja = mata(self.a, "B")
+        baja.activo = False
+        baja.save()
+        self.control(revisado, art(2026, 10, 3))
+        self.control(viejo, art(2026, 9, 3))
+        self.api.force_authenticate(self.oficina)
+        with reloj(art(2026, 10, 15)):
+            r = self.api.get("/api/clientes/resumen/")
+        self.assertEqual(r.status_code, 200)
+        a = {c["id"]: c for c in r.json()}[self.a.id]
+        self.assertEqual(a["total"], 3)  # la baja no cuenta
+        self.assertEqual(a["sin_revisar"], 2)  # viejo y nunca; la baja tampoco
+
+    def test_resumen_sigue_con_cantidad_fija_de_consultas(self):
+        def consultas():
+            self.api.force_authenticate(self.oficina)
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.api.get("/api/clientes/resumen/").status_code, 200)
+            return len(ctx)
+
+        for i in range(3):
+            self.control(mata(self.a, f"P{i}"))
+        pocas = consultas()
+        for i in range(30):
+            self.control(mata(self.a, f"G{i}"))
+        self.assertEqual(consultas(), pocas)

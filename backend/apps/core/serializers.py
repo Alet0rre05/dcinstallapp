@@ -121,13 +121,14 @@ class MatafuegoSerializer(serializers.ModelSerializer):
     problemas = serializers.SerializerMethodField()
     cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
     ultimo_control = serializers.SerializerMethodField()
+    revisado_mes = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Matafuego
         fields = [
             "id", "cliente", "cliente_nombre", "numero_serie", "clase", "ubicacion",
             "vencimiento_carga", "vencimiento_ph", "token_qr", "activo",
-            "estado_color", "problemas", "ultimo_control",
+            "estado_color", "problemas", "ultimo_control", "revisado_mes",
         ]
         read_only_fields = ["token_qr", "activo"]
 
