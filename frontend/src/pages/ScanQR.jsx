@@ -3,6 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
+import RevisionBadge from "../lib/RevisionBadge.jsx";
+import { FichaSkeleton } from "../lib/Skeleton.jsx";
 import { fechaHora } from "../lib/fmt.js";
 import { FormControl } from "../lib/FormControl.jsx";
 
@@ -82,7 +84,7 @@ export default function ScanQR() {
   useEffect(() => { if (!loading) cargar(); }, [loading, cargar]);
 
   if (error) return <p className="card mt-6 text-red-600">{error}</p>;
-  if (!pub) return <p className="p-6">Cargando…</p>;
+  if (!pub) return <div className="mx-auto mt-6 max-w-md"><FichaSkeleton /></div>;
 
   const m = priv || pub;
   const hecho = () => { setModo(null); cargar(); };
@@ -93,6 +95,8 @@ export default function ScanQR() {
         <h1 className="text-xl font-bold">Matafuego {m.numero_serie}</h1>
         <EstadoBadge estado={m.estado_color} />
       </div>
+      {/* Solo la vista privada trae revisado_mes; la pública no lo muestra */}
+      {priv && <div><RevisionBadge revisado={priv.revisado_mes} /></div>}
       <dl className="grid grid-cols-2 gap-y-1 text-sm">
         <dt className="text-slate-500">Cliente</dt><dd>{priv ? priv.cliente_nombre : pub.cliente}</dd>
         <dt className="text-slate-500">Clase</dt><dd>{m.clase || "—"}</dd>
@@ -120,13 +124,13 @@ export default function ScanQR() {
       {errorPriv && (
         <p role="alert" className="rounded border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700">
           No pudimos cargar todos los datos del equipo. Revisá tu conexión y{" "}
-          <button className="font-semibold text-brand underline" onClick={cargar}>reintentá</button>.
+          <button className="link" onClick={cargar}>reintentá</button>.
         </p>
       )}
 
       {!user && (
         <p className="pt-2 text-xs text-slate-500">
-          ¿Sos del equipo? <Link className="text-brand underline" to="/login" state={{ volverA: `/qr/${token}` }}>Ingresá</Link> para controlar o editar.
+          ¿Sos del equipo? <Link className="link" to="/login" state={{ volverA: `/qr/${token}` }}>Ingresá</Link> para controlar o editar.
         </p>
       )}
       {user && !tieneRol && (

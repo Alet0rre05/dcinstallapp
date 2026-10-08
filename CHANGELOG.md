@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.3.0
+
+### Agregado
+- **Estado REVISADO / NO REVISADO** a la izquierda de cada equipo en la lista del cliente y en la ficha (`lib/RevisionBadge.jsx`, siempre ícono + texto, independiente del semáforo). Un equipo pasa a REVISADO cuando se guarda un control y vuelve a NO REVISADO el día 1 de cada mes.
+- Campo `revisado_mes` (booleano, solo lectura) en `MatafuegoSerializer`. **No** se expone en la vista pública del QR.
+- `sin_revisar` en `GET /api/clientes/resumen/` y aviso "N sin revisar este mes" / "Todo revisado este mes" en cada tarjeta de cliente (misma cantidad fija de consultas).
+- Logo de DC INSTALL en la barra superior, en Ingresar y en Crear cuenta; favicon con el pez (32, 192 y 512 px) y `theme-color` celeste.
+- Skeletons de carga (`lib/Skeleton.jsx`) y estados vacíos con mensaje claro (`lib/EstadoVacio.jsx`).
+- Tests de la regla mensual en `RevisionMensualTests` (cambio de mes, borde horario UTC-3, API, QR público, cantidad de consultas).
+
+### Cambiado
+- Paleta **celeste `#64DCF4`**: barra superior y Panel de Control (con sus pestañas). Tokens `brand` (base, `dark`, `darker`, `light`), `ink` y `page` en `tailwind.config.js`; `.btn`, `.btn-sec`, `.input`, `.card` y los links migraron a esa paleta. Texto azul marino sobre celeste y blanco solo sobre el celeste oscuro (contraste AA).
+- Barra superior responsive: menú colapsable en celular, link activo resaltado y objetivos táctiles de 44 px; queda fija arriba al hacer scroll.
+- Campos y botones a 16 px (evita el zoom de iOS al enfocar); foco visible en toda la app.
+- El semáforo (`estado_color`, `EstadoBadge`), los avisos de error/advertencia y la impresión de etiquetas no cambian.
+
+### Notas de actualización
+- **No hay migraciones nuevas**: `revisado_mes` se calcula a partir de la fecha de los controles (hora de Buenos Aires), no se guarda; el reinicio del día 1 ocurre solo, sin cron ni tareas programadas.
+- No hay dependencias nuevas.
+- Los archivos nuevos de `frontend/public/` (logo y favicons) se publican con el build del frontend.
+
 ## 2.2.0
 
 ### Agregado

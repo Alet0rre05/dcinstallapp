@@ -172,9 +172,12 @@ class ClienteViewSet(viewsets.ModelViewSet):
             )
         )
         por_cliente = {c.id: dict.fromkeys(ESTADOS, 0) for c in clientes}
+        sin_revisar = dict.fromkeys(por_cliente, 0)  # equipos sin control en el mes actual
         for m in equipos:
             if m.cliente_id in por_cliente:
                 por_cliente[m.cliente_id][m.estado_color] += 1
+                if not m.revisado_mes:
+                    sin_revisar[m.cliente_id] += 1
         data = []
         for c in clientes:
             conteo = por_cliente[c.id]
@@ -185,6 +188,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
                 "por_estado": conteo,
                 "vencidos_criticos": conteo["ROJO"] + conteo["BORDO"],
                 "por_vencer": conteo["AMARILLO"],
+                "sin_revisar": sin_revisar[c.id],
             })
         return Response(data)
 

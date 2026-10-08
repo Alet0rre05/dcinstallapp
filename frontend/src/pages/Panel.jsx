@@ -11,11 +11,23 @@ export default function Panel() {
 
   return (
     <div>
-      <h1 className="mb-3 text-xl font-bold">Panel de Control</h1>
-      <div className="mb-4 flex gap-2">
-        {tabs.map(([k, label]) => (
-          <button key={k} onClick={() => setTab(k)} className={tab === k ? "btn" : "btn-sec"}>{label}</button>
-        ))}
+      <div className="mb-4 rounded-lg bg-brand p-4 text-ink shadow-sm">
+        <h1 className="mb-3 text-2xl font-bold">Panel de Control</h1>
+        <div role="tablist" aria-label="Secciones del panel" className="flex flex-wrap gap-2">
+          {tabs.map(([k, label]) => (
+            <button
+              key={k}
+              role="tab"
+              aria-selected={tab === k}
+              onClick={() => setTab(k)}
+              className={`inline-flex min-h-[44px] items-center rounded px-4 text-base font-semibold ${
+                tab === k ? "bg-ink text-white" : "bg-white/70 text-ink hover:bg-white active:bg-white"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       {tab === "equipo" && esAdmin && <Equipo />}
       {tab === "auditoria" && <Auditoria />}

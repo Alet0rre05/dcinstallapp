@@ -109,6 +109,22 @@ class Matafuego(models.Model):
             return None
         return max(controles, key=lambda c: (c.fecha, c.pk))
 
+    @property
+    def revisado_mes(self):
+        """
+        True si hay al menos un control cuya fecha (en hora local del proyecto) cae en el
+        mes calendario actual. Es un valor calculado, no guardado: el día 1 de cada mes
+        pasa solo a False, sin cron ni migraciones. Cuenta cualquier control, aunque
+        detecte problemas (el semáforo es quien dice cómo está el equipo).
+        Usa .all() para aprovechar prefetch_related("controles").
+        """
+        hoy = timezone.localdate()
+        for c in self.controles.all():
+            f = timezone.localtime(c.fecha)
+            if f.year == hoy.year and f.month == hoy.month:
+                return True
+        return False
+
     def problemas(self):
         """Lista de problemas detectados según el último control y vencimientos."""
         hoy = timezone.localdate()

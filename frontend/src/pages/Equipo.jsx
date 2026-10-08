@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
+import { ListaSkeleton } from "../lib/Skeleton.jsx";
 import { useAuth } from "../lib/auth.jsx";
 import { rolLabel } from "../lib/fmt.js";
 
@@ -110,7 +111,7 @@ export default function Equipo() {
     <div>
       <AsignarForm clientes={clientes} onDone={cargar} />
       <input className="input mb-3" placeholder="Buscar por nombre, usuario o email…" value={q} onChange={(e) => setQ(e.target.value)} />
-      {!usuarios ? <p>Cargando…</p> : (
+      {!usuarios ? <ListaSkeleton filas={3} alto="h-16" /> : (
         <ul className="space-y-2">
           {usuarios.map((u) => (
             <li key={u.id} className="card">
@@ -120,7 +121,7 @@ export default function Equipo() {
                   <p className="text-sm text-slate-500">{u.email}</p>
                   {u.rol && <p className="text-xs text-slate-500">Clientes: {u.clientes.map((c) => c.nombre).join(", ") || "ninguno"}</p>}
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${u.rol ? "bg-brand text-white" : "bg-slate-200"}`}>{rolLabel(u.rol)}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${u.rol ? "bg-brand-dark text-white" : "bg-slate-200"}`}>{rolLabel(u.rol)}</span>
                 {u.rol && !u.is_superuser && (
                   <button className="btn-sec" onClick={() => setEditando(editando === u.id ? null : u.id)}>Clientes</button>
                 )}

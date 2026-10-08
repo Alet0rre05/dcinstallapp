@@ -1,5 +1,6 @@
 import { useState } from "react";
 import EstadoBadge from "./EstadoBadge.jsx";
+import RevisionBadge from "./RevisionBadge.jsx";
 import { FormControl } from "./FormControl.jsx";
 import QRMatafuego, { urlQR } from "./QRMatafuego.jsx";
 import { fechaHora } from "./fmt.js";
@@ -18,18 +19,21 @@ export default function FichaMatafuego({ m, esStaff, esCampo, onBaja, onRestaura
   return (
     <section className="card space-y-3" aria-label={`Ficha del matafuego ${m.numero_serie}`}>
       <div className="flex flex-wrap items-start gap-3">
-        <div className="mr-auto">
-          <h2 className="text-xl font-bold">
+        <div className="mr-auto min-w-0">
+          <h2 className="text-2xl font-bold text-ink">
             N° {m.numero_serie}{" "}
             {!m.activo && <span className="rounded bg-slate-200 px-1 text-xs font-normal">BAJA</span>}
           </h2>
           <p className="text-base text-slate-600">{m.clase || "—"} · {m.ubicacion || "Sin ubicación"}</p>
         </div>
-        <EstadoBadge estado={m.estado_color} />
+        <div className="flex flex-wrap items-center gap-2">
+          <RevisionBadge revisado={m.revisado_mes} />
+          <EstadoBadge estado={m.estado_color} />
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-y-1 text-base">
-        <dt className="text-slate-500">Venc. carga</dt><dd>{fecha(m.vencimiento_carga)}</dd>
+        <dt className="text-slate-500">Venc. carga</dt><dd className="font-medium">{fecha(m.vencimiento_carga)}</dd>
         <dt className="text-slate-500">Venc. PH</dt><dd>{fecha(m.vencimiento_ph)}</dd>
         <dt className="text-slate-500">Último control</dt><dd>{fechaHora(m.ultimo_control)}</dd>
       </dl>
@@ -54,7 +58,7 @@ export default function FichaMatafuego({ m, esStaff, esCampo, onBaja, onRestaura
       {verQR && (
         <div className="flex flex-col items-center gap-1">
           <QRMatafuego token={m.token_qr} />
-          <a className="break-all text-xs text-brand underline" href={urlQR(m.token_qr)} target="_blank" rel="noreferrer">{urlQR(m.token_qr)}</a>
+          <a className="link break-all text-sm" href={urlQR(m.token_qr)} target="_blank" rel="noreferrer">{urlQR(m.token_qr)}</a>
         </div>
       )}
       {controlando && (
