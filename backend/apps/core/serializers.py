@@ -164,6 +164,14 @@ class MatafuegoPublicoSerializer(serializers.ModelSerializer):
         return c.fecha if c else None
 
 
+class ImportarMatafuegosSerializer(serializers.Serializer):
+    """Entrada de la carga masiva (multipart). El contenido del archivo lo valida importacion.py."""
+
+    archivo = serializers.FileField(max_length=255)
+    cliente = serializers.IntegerField()
+    dry_run = serializers.BooleanField(required=False, default=False)
+
+
 class ControlSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
 

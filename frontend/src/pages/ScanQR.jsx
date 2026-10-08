@@ -4,7 +4,7 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
 import { fechaHora } from "../lib/fmt.js";
-import { FormControl } from "./Matafuegos.jsx";
+import { FormControl } from "../lib/FormControl.jsx";
 
 const fecha = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("es-AR") : "—");
 
@@ -50,6 +50,8 @@ export default function ScanQR() {
   const { user, loading, tieneRol, esStaff, esCampo } = useAuth();
   const [pub, setPub] = useState(null);
   const [priv, setPriv] = useState(null);
+  const [sinAsignar, setSinAsignar] = useState(false); // tiene rol, pero el equipo es de un cliente que no tiene asignado
+  const [errorPriv, setErrorPriv] = useState(false); // la carga privada falló por otro motivo (red, 5xx…)
   const [error, setError] = useState("");
   const [modo, setModo] = useState(null); // "control" | "editar"
 
@@ -60,11 +62,17 @@ export default function ScanQR() {
       setError("Matafuego no encontrado o dado de baja.");
       return;
     }
+    setSinAsignar(false);
+    setErrorPriv(false);
     if (tieneRol) {
       try {
         setPriv(await api(`/matafuegos/qr/${token}/`));
-      } catch {
-        setPriv(null); // sin permisos sobre este cliente: se queda la vista pública
+      } catch (err) {
+        setPriv(null); // se queda la vista pública
+        // El backend responde 404 cuando el equipo existe pero es de un cliente no asignado al usuario.
+        // Cualquier otra cosa (sin red, 5xx, sesión vencida…) NO es un tema de asignación.
+        if (err.status === 404) setSinAsignar(true);
+        else setErrorPriv(true);
       }
     } else {
       setPriv(null);
@@ -103,6 +111,18 @@ export default function ScanQR() {
       )}
       {priv && modo === "control" && <FormControl matafuego={priv} onDone={hecho} />}
       {priv && modo === "editar" && esStaff && <FormEditar m={priv} onDone={hecho} />}
+
+      {sinAsignar && (
+        <p role="status" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
+          Este equipo pertenece a un cliente que no tenés asignado. Pedile a la oficina que te lo asigne.
+        </p>
+      )}
+      {errorPriv && (
+        <p role="alert" className="rounded border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700">
+          No pudimos cargar todos los datos del equipo. Revisá tu conexión y{" "}
+          <button className="font-semibold text-brand underline" onClick={cargar}>reintentá</button>.
+        </p>
+      )}
 
       {!user && (
         <p className="pt-2 text-xs text-slate-500">

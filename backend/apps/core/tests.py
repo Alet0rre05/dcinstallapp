@@ -1,8 +1,15 @@
-from datetime import timedelta
+import io
+import zipfile
+from datetime import date, timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import IntegrityError, connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from openpyxl import Workbook, load_workbook
 from rest_framework.test import APIClient
 
 from .models import (
@@ -353,3 +360,509 @@ class RolesYEquipoTests(TestCase):
             ev.save()
         with self.assertRaises(PermissionError):
             ev.delete()
+
+
+@override_settings(AXES_ENABLED=False, SECURE_SSL_REDIRECT=False)
+class ClientesPaginacionYResumenTests(TestCase):
+    """V2.2 · Paso 1: filtro por cliente, paginación grande y resumen por cliente."""
+
+    def setUp(self):
+        self.api = APIClient()
+        self.a = Cliente.objects.create(nombre="A")
+        self.b = Cliente.objects.create(nombre="B")
+        self.vacio = Cliente.objects.create(nombre="Vacío")
+        self.admin = User.objects.create_superuser("admin", "admin@x.com", "Clave-Segura-123")
+        self.oficina = self._user("ofi", Rol.OFICINA, [self.a, self.b])
+        self.operario = self._user("ope", Rol.OPERARIO, [self.a, self.vacio])
+        self.publico = self._user("pub", None, [])
+
+    def _user(self, username, rol, clientes):
+        u = User.objects.create_user(username, f"{username}@x.com", "Clave-Segura-123")
+        u.perfil.rol = rol
+        u.perfil.save()
+        u.perfil.clientes.set(clientes)
+        return u
+
+    def control(self, m, **kw):
+        return Control.objects.create(matafuego=m, usuario=self.admin, **kw)
+
+    def series(self, resp):
+        return {x["numero_serie"] for x in resp.json()["results"]}
+
+    # -- Filtro ?cliente= y scoping ----------------------------------------
+    def test_filtro_por_cliente(self):
+        mata(self.a, "A1"), mata(self.a, "A2"), mata(self.b, "B1")
+        self.api.force_authenticate(self.oficina)
+        self.assertEqual(self.series(self.api.get(f"/api/matafuegos/?cliente={self.a.id}")), {"A1", "A2"})
+        self.assertEqual(self.series(self.api.get(f"/api/matafuegos/?cliente={self.b.id}")), {"B1"})
+        self.assertEqual(self.series(self.api.get("/api/matafuegos/")), {"A1", "A2", "B1"})
+
+    def test_cliente_ajeno_da_lista_vacia(self):
+        mata(self.a, "A1"), mata(self.b, "B1")
+        self.api.force_authenticate(self.operario)  # tiene A y Vacío, no B
+        r = self.api.get(f"/api/matafuegos/?cliente={self.b.id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["count"], 0)
+        self.assertEqual(self.series(self.api.get("/api/matafuegos/")), {"A1"})  # y sin filtro tampoco
+
+    def test_filtro_cliente_invalido_es_400_no_500(self):
+        self.api.force_authenticate(self.oficina)
+        for valor in ("abc", "1;DROP", "9" * 30, "-1"):
+            self.assertEqual(self.api.get(f"/api/matafuegos/?cliente={valor}").status_code, 400, valor)
+
+    # -- Paginación -----------------------------------------------------------
+    def test_paginacion_mas_de_20_equipos(self):
+        Matafuego.objects.bulk_create(
+            [Matafuego(cliente=self.a, numero_serie=f"S{i:03d}") for i in range(130)]
+        )
+        self.api.force_authenticate(self.operario)
+        r1 = self.api.get(f"/api/matafuegos/?cliente={self.a.id}").json()
+        self.assertEqual(r1["count"], 130)
+        self.assertEqual(len(r1["results"]), 100)  # antes eran 20: los 21+ no se veían
+        self.assertIsNotNone(r1["next"])
+        r2 = self.api.get(r1["next"]).json()
+        self.assertEqual(len(r2["results"]), 30)
+        self.assertIsNone(r2["next"])
+        vistos = {x["numero_serie"] for x in r1["results"] + r2["results"]}
+        self.assertEqual(len(vistos), 130)  # sin repetidos ni faltantes
+
+    def test_page_size_configurable_y_con_tope(self):
+        Matafuego.objects.bulk_create(
+            [Matafuego(cliente=self.a, numero_serie=f"S{i:03d}") for i in range(130)]
+        )
+        self.api.force_authenticate(self.operario)
+        r = self.api.get("/api/matafuegos/?page_size=500").json()
+        self.assertEqual(len(r["results"]), 130)
+        self.assertIsNone(r["next"])
+        self.assertEqual(len(self.api.get("/api/matafuegos/?page_size=25").json()["results"]), 25)
+        from .views import MatafuegoPagination
+
+        self.assertEqual(MatafuegoPagination.max_page_size, 500)
+
+    # -- Resumen -----------------------------------------------------------------
+    def armar_estados(self):
+        mata(self.a, "VERDE"), mata(self.a, "AMARILLO", carga=HOY + timedelta(days=10))
+        mata(self.a, "ROJO", carga=HOY - timedelta(days=1))
+        mata(self.a, "BORDO", carga=HOY - timedelta(days=1), ph=HOY - timedelta(days=1))
+        mata(self.a, "GRIS")
+        for m in Matafuego.objects.filter(cliente=self.a).exclude(numero_serie="GRIS"):
+            self.control(m)  # GRIS queda sin controles
+        baja = mata(self.a, "BAJA")
+        baja.activo = False
+        baja.save()
+        mata(self.b, "B1")
+
+    def test_resumen_conteo_por_estado(self):
+        self.armar_estados()
+        self.api.force_authenticate(self.oficina)
+        r = self.api.get("/api/clientes/resumen/")
+        self.assertEqual(r.status_code, 200)
+        por_id = {c["id"]: c for c in r.json()}
+        a = por_id[self.a.id]
+        self.assertEqual(a["nombre"], "A")
+        self.assertEqual(a["total"], 5)  # la baja no cuenta
+        self.assertEqual(
+            a["por_estado"], {"BORDO": 1, "ROJO": 1, "AMARILLO": 1, "GRIS": 1, "VERDE": 1}
+        )
+        self.assertEqual(a["vencidos_criticos"], 2)
+        self.assertEqual(a["por_vencer"], 1)
+        self.assertEqual(por_id[self.b.id]["total"], 1)
+
+    def test_resumen_respeta_clientes_asignados(self):
+        self.armar_estados()
+        self.api.force_authenticate(self.operario)  # A y Vacío
+        res = self.api.get("/api/clientes/resumen/").json()
+        self.assertEqual({c["nombre"] for c in res}, {"A", "Vacío"})
+        vacio = next(c for c in res if c["nombre"] == "Vacío")
+        self.assertEqual(vacio["total"], 0)  # un cliente sin equipos igual aparece
+        self.assertEqual(vacio["vencidos_criticos"], 0)
+        self.api.force_authenticate(self.admin)
+        self.assertEqual(len(self.api.get("/api/clientes/resumen/").json()), 3)
+
+    def test_resumen_exige_sesion_y_rol(self):
+        self.api.force_authenticate(None)
+        self.assertEqual(self.api.get("/api/clientes/resumen/").status_code, 401)
+        self.api.force_authenticate(self.publico)
+        self.assertEqual(self.api.get("/api/clientes/resumen/").status_code, 403)
+
+    def test_resumen_no_tiene_n_mas_1(self):
+        def consultas():
+            self.api.force_authenticate(self.oficina)
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.api.get("/api/clientes/resumen/").status_code, 200)
+            return len(ctx)
+
+        for i in range(3):
+            self.control(mata(self.a, f"P{i}"))
+        pocas = consultas()
+        for i in range(40):
+            self.control(mata(self.a, f"G{i}"))
+            mata(self.b, f"H{i}")
+        self.assertEqual(consultas(), pocas)
+
+
+# ---------------------------------------------------------------------------
+# V2.2 · Paso 3: carga masiva desde Excel / CSV
+# ---------------------------------------------------------------------------
+ENCABEZADO = ("numero_serie", "clase", "ubicacion", "vencimiento_carga", "vencimiento_ph")
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def xlsx_bytes(filas, encabezado=ENCABEZADO, hoja="Equipos"):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = hoja
+    ws.append(list(encabezado))
+    for f in filas:
+        ws.append(list(f))
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+@override_settings(AXES_ENABLED=False, SECURE_SSL_REDIRECT=False)
+class ImportacionMasivaTests(TestCase):
+    def setUp(self):
+        self.api = APIClient()
+        self.a = Cliente.objects.create(nombre="A")
+        self.b = Cliente.objects.create(nombre="B")
+        self.admin = User.objects.create_superuser("admin", "admin@x.com", "Clave-Segura-123")
+        self.oficina = self._user("ofi", Rol.OFICINA, [self.a])
+        self.operario = self._user("ope", Rol.OPERARIO, [self.a])
+        self.publico = self._user("pub", None, [])
+        self.api.force_authenticate(self.oficina)
+
+    def _user(self, username, rol, clientes):
+        u = User.objects.create_user(username, f"{username}@x.com", "Clave-Segura-123")
+        u.perfil.rol = rol
+        u.perfil.save()
+        u.perfil.clientes.set(clientes)
+        return u
+
+    def subir(self, contenido, nombre="equipos.xlsx", cliente=None, dry_run=False, mime=XLSX_MIME):
+        return self.api.post(
+            "/api/matafuegos/importar/",
+            {
+                "archivo": SimpleUploadedFile(nombre, contenido, content_type=mime),
+                "cliente": (cliente or self.a).id,
+                "dry_run": "true" if dry_run else "false",
+            },
+            format="multipart",
+        )
+
+    def textos_error(self, r):
+        return [e["texto"] for e in r.json()["errores"]]
+
+    # -- Plantilla ------------------------------------------------------------------
+    def test_plantilla_para_staff(self):
+        for u in (self.oficina, self.admin):
+            self.api.force_authenticate(u)
+            r = self.api.get("/api/matafuegos/plantilla-importacion/")
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r["Content-Type"], XLSX_MIME)
+            self.assertIn("plantilla_matafuegos.xlsx", r["Content-Disposition"])
+        wb = load_workbook(io.BytesIO(r.content))
+        self.assertEqual(wb.sheetnames, ["Equipos", "Instrucciones"])
+        self.assertEqual([c.value for c in wb["Equipos"][1]], list(ENCABEZADO))
+        self.assertEqual(wb["Equipos"]["A2"].value, "EJEMPLO-001")  # una fila de ejemplo
+        self.assertIsNone(wb["Equipos"]["A3"].value)
+
+    def test_plantilla_se_puede_importar_tal_cual_menos_el_ejemplo(self):
+        r = self.api.get("/api/matafuegos/plantilla-importacion/")
+        r = self.subir(r.content, dry_run=True)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual((r.json()["validas"], r.json()["con_error"]), (1, 0))
+        self.assertEqual(r.json()["muestra"][0]["numero_serie"], "EJEMPLO-001")
+
+    def test_plantilla_prohibida_para_operario_publico_y_anonimo(self):
+        for u, esperado in ((self.operario, 403), (self.publico, 403), (None, 401)):
+            self.api.force_authenticate(u)
+            self.assertEqual(self.api.get("/api/matafuegos/plantilla-importacion/").status_code, esperado)
+
+    # -- Importación válida --------------------------------------------------------
+    def test_importacion_valida_guarda_historial_y_una_sola_auditoria(self):
+        contenido = xlsx_bytes([
+            ("N1", "ABC", "Hall", date(2027, 3, 15), "20/04/2030"),  # celda de fecha y texto dd/mm/aaaa
+            ("N2", "BC", "Taller", None, None),
+            (3, None, None, None, None),  # serie numérica
+        ])
+        r = self.subir(contenido, nombre="mis equipos.xlsx")
+        self.assertEqual(r.status_code, 201, r.content)
+        body = r.json()
+        self.assertEqual(body["creados"], 3)
+        self.assertEqual(len(body["ids"]), 3)
+
+        creados = Matafuego.objects.filter(id__in=body["ids"])
+        self.assertEqual(set(creados.values_list("numero_serie", flat=True)), {"N1", "N2", "3"})
+        self.assertTrue(all(m.cliente_id == self.a.id and m.activo for m in creados))
+        n1 = creados.get(numero_serie="N1")
+        self.assertEqual(n1.vencimiento_carga, date(2027, 3, 15))
+        self.assertEqual(n1.vencimiento_ph, date(2030, 4, 20))
+        self.assertEqual(len({m.token_qr for m in creados}), 3)  # un QR único por equipo
+
+        hist = Matafuego.history.filter(id__in=body["ids"])
+        self.assertEqual(hist.count(), 3)
+        self.assertTrue(all(h.history_type == "+" and h.history_user_id == self.oficina.id for h in hist))
+
+        eventos = Auditoria.objects.filter(accion="IMPORTACION")
+        self.assertEqual(eventos.count(), 1)  # UNA entrada por importación
+        ev = eventos.get()
+        self.assertEqual((ev.usuario_nombre, ev.rol, ev.cliente_id), ("ofi", "OFICINA", self.a.id))
+        self.assertEqual(ev.despues["cantidad"], 3)
+        self.assertEqual(ev.despues["archivo"], "mis equipos.xlsx")
+        self.assertFalse(Auditoria.objects.filter(accion="CREACION", objeto="Matafuego").exists())
+
+    def test_dry_run_no_guarda_ni_audita(self):
+        r = self.subir(xlsx_bytes([("N1", "ABC", "", None, None), ("N2", "", "", "mala", None)]), dry_run=True)
+        self.assertEqual(r.status_code, 200)
+        b = r.json()
+        self.assertEqual((b["dry_run"], b["total_filas"], b["validas"], b["con_error"]), (True, 2, 1, 1))
+        self.assertEqual(self.textos_error(r), ["Fila 3: fecha de carga inválida (usá dd/mm/aaaa)"])
+        self.assertEqual(Matafuego.objects.count(), 0)
+        self.assertFalse(Auditoria.objects.filter(accion="IMPORTACION").exists())
+
+    def test_importa_csv_con_punto_y_coma_y_acentos_cp1252(self):
+        csv_txt = "Número de serie;Clase;Ubicación;Venc. carga;Venc. PH\nC1;ABC;Cocina ñandú;15/03/2027;\n"
+        r = self.subir(csv_txt.encode("cp1252"), nombre="datos.csv", mime="text/csv")
+        self.assertEqual(r.status_code, 201, r.content)
+        m = Matafuego.objects.get(numero_serie="C1")
+        self.assertEqual((m.ubicacion, m.vencimiento_carga), ("Cocina ñandú", date(2027, 3, 15)))
+
+    def test_mil_filas_con_pocas_consultas(self):
+        filas = [(f"S{i:04d}", "ABC", f"Piso {i % 9}", date(2027, 1, 1), None) for i in range(1000)]
+        contenido = xlsx_bytes(filas)
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.subir(contenido)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Matafuego.objects.count(), 1000)
+        self.assertEqual(Matafuego.history.count(), 1000)
+        self.assertLess(len(ctx), 40)  # inserción en bloque, no una consulta por equipo
+
+    # -- Validaciones ------------------------------------------------------------
+    def test_duplicados_dentro_del_archivo(self):
+        r = self.subir(xlsx_bytes([("D1", "", "", None, None), ("D2", "", "", None, None), ("D1", "", "", None, None)]), dry_run=True)
+        self.assertEqual(r.json()["con_error"], 1)
+        self.assertIn("Fila 4: n° de serie «D1» repetido en el archivo (ya estaba en la fila 2)", self.textos_error(r))
+
+    def test_duplicados_contra_la_base_incluye_bajas_y_no_guarda_nada(self):
+        mata(self.a, "X1")
+        baja = mata(self.a, "X2")
+        baja.activo = False
+        baja.save()
+        mata(self.b, "X3")  # misma serie en OTRO cliente: permitida
+        r = self.subir(xlsx_bytes([("X1", "", "", None, None), ("X2", "", "", None, None), ("X3", "", "", None, None), ("NUEVO", "", "", None, None)]))
+        self.assertEqual(r.status_code, 400)
+        errores = self.textos_error(r)
+        self.assertEqual(len(errores), 2)
+        self.assertIn("Fila 2: n° de serie «X1» ya existe para este cliente", errores)
+        self.assertTrue(errores[1].startswith("Fila 3:") and "dado de baja" in errores[1])
+        self.assertFalse(Matafuego.objects.filter(numero_serie="NUEVO").exists())  # todo o nada
+
+    def test_fecha_invalida_indica_la_fila_exacta(self):
+        filas = [(f"F{i}", "", "", None, None) for i in range(12)] + [("MALA", "", "", "31/02/2027", None)]
+        r = self.subir(xlsx_bytes(filas), dry_run=True)
+        self.assertEqual(self.textos_error(r), ["Fila 14: fecha de carga inválida (usá dd/mm/aaaa)"])
+
+    def test_fecha_ph_invalida_y_fuera_de_rango(self):
+        r = self.subir(xlsx_bytes([("P1", "", "", None, "hoy"), ("P2", "", "", date(1850, 1, 1), None)]), dry_run=True)
+        t = self.textos_error(r)
+        self.assertIn("Fila 2: fecha de PH inválida (usá dd/mm/aaaa)", t)
+        self.assertIn("Fila 3: fecha de carga fuera de rango (usá dd/mm/aaaa)", t)
+
+    def test_serie_obligatoria_y_largos_maximos(self):
+        r = self.subir(xlsx_bytes([("", "ABC", "", None, None), ("L1", "C" * 31, "", None, None), ("S" * 61, "", "", None, None), ("U1", "", "u" * 201, None, None)]), dry_run=True)
+        t = self.textos_error(r)
+        self.assertIn("Fila 2: falta el n° de serie", t)
+        self.assertIn("Fila 3: clase demasiado largo (máximo 30 caracteres)", t)
+        self.assertIn("Fila 4: n° de serie demasiado largo (máximo 60 caracteres)", t)
+        self.assertIn("Fila 5: ubicación demasiado largo (máximo 200 caracteres)", t)
+
+    def test_filas_vacias_se_ignoran_y_conservan_la_numeracion(self):
+        r = self.subir(xlsx_bytes([("V1", "", "", None, None), (None,) * 5, (None,) * 5, ("V2", "", "", "x", None)]), dry_run=True)
+        self.assertEqual(r.json()["total_filas"], 2)
+        self.assertEqual(self.textos_error(r), ["Fila 5: fecha de carga inválida (usá dd/mm/aaaa)"])
+
+    def test_formulas_no_se_evaluan(self):
+        r = self.subir(xlsx_bytes([("=1+1", "", "", None, None), ("OK", "", "", "=HOY()", None)]), dry_run=True)
+        t = self.textos_error(r)
+        self.assertTrue(any(x.startswith("Fila 2:") and "fórmula" in x for x in t), t)
+        self.assertTrue(any(x.startswith("Fila 3:") and "fórmula" in x for x in t), t)
+        self.assertFalse(Matafuego.objects.exists())
+
+    def test_falta_columna_numero_serie(self):
+        r = self.subir(xlsx_bytes([("ABC",)], encabezado=("clase",)))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("numero_serie", r.json()["detail"])
+
+    def test_archivo_sin_filas(self):
+        self.assertEqual(self.subir(xlsx_bytes([])).status_code, 400)
+
+    # -- Límites y contenido real ----------------------------------------------------
+    def test_archivo_de_mas_de_5mb_es_413(self):
+        grande = b"numero_serie\n" + b"X" * (5 * 1024 * 1024 + 10)
+        r = self.subir(grande, nombre="grande.csv", mime="text/csv")
+        self.assertEqual(r.status_code, 413)
+        self.assertFalse(Matafuego.objects.exists())
+
+    def test_mas_de_5000_filas_se_rechaza(self):
+        csv_txt = "numero_serie\n" + "\n".join(f"S{i}" for i in range(5001))
+        r = self.subir(csv_txt.encode(), nombre="muchas.csv", mime="text/csv")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("5.000", r.json()["detail"])
+        ok = "numero_serie\n" + "\n".join(f"S{i}" for i in range(5000))
+        self.assertEqual(self.subir(ok.encode(), nombre="justo.csv", mime="text/csv", dry_run=True).json()["validas"], 5000)
+
+    def test_no_se_confia_en_extension_ni_mime(self):
+        # texto plano que dice ser xlsx (con MIME de xlsx)
+        self.assertEqual(self.subir(b"numero_serie\nA1\n", nombre="falso.xlsx").status_code, 400)
+        # un xlsx real que dice ser csv
+        r = self.subir(xlsx_bytes([("A1", "", "", None, None)]), nombre="falso.csv", mime="text/csv")
+        self.assertEqual(r.status_code, 400)
+        # binario cualquiera como csv
+        self.assertEqual(self.subir(b"MZ\x90\x00\x03\x00\x00\x00", nombre="x.csv", mime="text/csv").status_code, 400)
+        # extensión no permitida aunque el contenido sea válido
+        self.assertEqual(self.subir(xlsx_bytes([("A1", "", "", None, None)]), nombre="datos.txt").status_code, 400)
+        self.assertEqual(self.subir(xlsx_bytes([("A1", "", "", None, None)]), nombre="datos.xls").status_code, 400)
+        self.assertFalse(Matafuego.objects.exists())
+
+    def _zip(self, archivos):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for nombre, datos in archivos.items():
+                z.writestr(nombre, datos)
+        return buf.getvalue()
+
+    def test_zip_bomb_y_xml_con_entidades_se_rechazan(self):
+        base = {"[Content_Types].xml": "<Types/>", "xl/workbook.xml": "<workbook/>"}
+        bomba = self._zip({**base, "xl/relleno.bin": b"\0" * (51 * 1024 * 1024)})  # comprime a pocos KB
+        self.assertLess(len(bomba), 5 * 1024 * 1024)
+        self.assertEqual(self.subir(bomba).status_code, 400)
+        xxe = self._zip({**base, "xl/workbook.xml": '<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "b">]><workbook/>'})
+        self.assertEqual(self.subir(xxe).status_code, 400)
+        self.assertEqual(self.subir(self._zip({"cualquiera.txt": "hola"})).status_code, 400)
+
+    # -- Permisos por rol y por cliente -------------------------------------------------
+    def test_roles_sin_permiso(self):
+        contenido = xlsx_bytes([("P1", "", "", None, None)])
+        for u, esperado in ((self.operario, 403), (self.publico, 403), (None, 401)):
+            self.api.force_authenticate(u)
+            self.assertEqual(self.subir(contenido).status_code, esperado)
+        self.assertFalse(Matafuego.objects.exists())
+
+    def test_oficina_solo_importa_a_sus_clientes(self):
+        contenido = xlsx_bytes([("P1", "", "", None, None)])
+        r = self.subir(contenido, cliente=self.b)  # oficina tiene solo A
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Matafuego.objects.exists())
+        self.assertEqual(self.subir(contenido, cliente=self.b, dry_run=True).status_code, 403)  # ni siquiera valida
+
+    def test_cliente_inexistente_responde_igual_que_ajeno(self):
+        r = self.api.post(
+            "/api/matafuegos/importar/",
+            {"archivo": SimpleUploadedFile("a.xlsx", xlsx_bytes([("P1", "", "", None, None)]), content_type=XLSX_MIME), "cliente": 99999},
+            format="multipart",
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_admin_importa_a_cualquier_cliente(self):
+        self.api.force_authenticate(self.admin)
+        r = self.subir(xlsx_bytes([("P1", "", "", None, None)]), cliente=self.b)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(Matafuego.objects.get(numero_serie="P1").cliente_id, self.b.id)
+
+    def test_requiere_archivo_y_cliente(self):
+        self.assertEqual(self.api.post("/api/matafuegos/importar/", {"cliente": self.a.id}, format="multipart").status_code, 400)
+        self.assertEqual(self.api.post("/api/matafuegos/importar/", {}, format="multipart").status_code, 400)
+
+    # -- Atomicidad -------------------------------------------------------------------
+    def test_un_error_en_la_ultima_fila_no_deja_nada_guardado(self):
+        filas = [(f"A{i}", "ABC", "", None, None) for i in range(99)] + [("MALA", "", "", "no-es-fecha", None)]
+        r = self.subir(xlsx_bytes(filas))
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["validas"], 99)
+        self.assertEqual(r.json()["errores"][0]["fila"], 101)
+        self.assertEqual(Matafuego.objects.count(), 0)
+        self.assertEqual(Matafuego.history.count(), 0)
+        self.assertFalse(Auditoria.objects.filter(accion="IMPORTACION").exists())
+
+    def test_carrera_con_otra_carga_revierte_todo(self):
+        """Si la base rechaza el guardado a mitad de camino (serie duplicada por una carga
+        simultánea), la transacción se revierte completa: ni equipos, ni historial, ni auditoría."""
+
+        def falla_a_mitad(objs, model, **kw):
+            model.objects.bulk_create(objs[:2])  # ya escribió algo...
+            raise IntegrityError("duplicate key")  # ...y luego se cae
+
+        with mock.patch("apps.core.views.bulk_create_with_history", side_effect=falla_a_mitad):
+            r = self.subir(xlsx_bytes([(f"R{i}", "", "", None, None) for i in range(5)]))
+        self.assertEqual(r.status_code, 409)
+        self.assertEqual(Matafuego.objects.count(), 0)
+        self.assertFalse(Auditoria.objects.filter(accion="IMPORTACION").exists())
+
+
+@override_settings(AXES_ENABLED=False, SECURE_SSL_REDIRECT=False)
+class QRClienteNoAsignadoTests(TestCase):
+    """V2.2 · Paso 5: contrato de status que usa ScanQR.jsx para distinguir los casos.
+    404 en /matafuegos/qr/<token>/ = equipo de un cliente NO asignado (aviso de asignación);
+    cualquier otro código es otro problema y el front no debe mostrar ese aviso."""
+
+    def setUp(self):
+        self.api = APIClient()
+        self.a = Cliente.objects.create(nombre="A")
+        self.b = Cliente.objects.create(nombre="B")
+        self.operario = self._user("ope", Rol.OPERARIO, [self.a])
+        self.publico = self._user("pub", None, [])
+        self.propio = mata(self.a, "PROPIO")
+        self.ajeno = mata(self.b, "AJENO", carga=HOY + timedelta(days=5))
+        self.ajeno.ubicacion = "Sala de servidores"
+        self.ajeno.save()
+
+    def _user(self, username, rol, clientes):
+        u = User.objects.create_user(username, f"{username}@x.com", "Clave-Segura-123")
+        u.perfil.rol = rol
+        u.perfil.save()
+        u.perfil.clientes.set(clientes)
+        return u
+
+    def privado(self, m):
+        return self.api.get(f"/api/matafuegos/qr/{m.token_qr}/")
+
+    def test_operario_con_cliente_asignado_recibe_la_ficha_completa(self):
+        self.api.force_authenticate(self.operario)
+        r = self.privado(self.propio)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["id"], self.propio.id)  # datos para "Nuevo control"
+        self.assertIn("problemas", r.json())
+
+    def test_cliente_ajeno_es_404_sin_ningun_dato_del_equipo(self):
+        self.api.force_authenticate(self.operario)
+        r = self.privado(self.ajeno)
+        self.assertEqual(r.status_code, 404)
+        cuerpo = r.content.decode()
+        for dato in ("AJENO", "Sala de servidores", str(self.ajeno.token_qr)):
+            self.assertNotIn(dato, cuerpo)
+        self.assertEqual(list(r.json().keys()), ["detail"])  # no se agrega nada a lo que ya era público
+
+    def test_la_ficha_publica_del_mismo_equipo_sigue_igual(self):
+        self.api.force_authenticate(self.operario)
+        r = self.api.get(f"/api/public/qr/{self.ajeno.token_qr}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            set(r.json()),
+            {"numero_serie", "clase", "ubicacion", "cliente", "vencimiento_carga", "vencimiento_ph",
+             "estado_color", "ultimo_control"},
+        )
+
+    def test_operario_no_puede_controlar_un_equipo_de_cliente_ajeno(self):
+        self.api.force_authenticate(self.operario)
+        r = self.api.post("/api/controles/", {"matafuego": self.ajeno.id, "presion": "NORMAL"}, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Control.objects.filter(matafuego=self.ajeno).exists())
+
+    def test_los_demas_casos_no_son_404(self):
+        # sin sesión -> 401 y con cuenta sin rol -> 403: el front ni siquiera consulta el endpoint privado
+        self.api.force_authenticate(None)
+        self.assertEqual(self.privado(self.propio).status_code, 401)
+        self.assertEqual(self.api.get(f"/api/public/qr/{self.propio.token_qr}/").status_code, 200)
+        self.api.force_authenticate(self.publico)
+        self.assertEqual(self.privado(self.propio).status_code, 403)

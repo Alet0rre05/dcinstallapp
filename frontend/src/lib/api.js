@@ -23,15 +23,18 @@ function extractMessage(data) {
   return k === "non_field_errors" ? msg : `${k}: ${msg}`;
 }
 
-export async function api(path, { method = "GET", body, auth = true } = {}) {
-  const headers = { "Content-Type": "application/json" };
+export async function api(path, { method = "GET", body, auth = true, blob = false } = {}) {
+  // FormData (subida de archivos): el navegador arma el Content-Type con su boundary.
+  const esForm = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers = esForm ? {} : { "Content-Type": "application/json" };
   const token = getToken();
   if (auth && token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (esForm ? body : JSON.stringify(body)) : undefined,
   });
+  if (blob && res.ok) return res.blob(); // descargas (ej. plantilla .xlsx)
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data);
   return data;

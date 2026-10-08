@@ -8,6 +8,8 @@ import Perfil from "./pages/Perfil.jsx";
 import ScanQR from "./pages/ScanQR.jsx";
 import Panel from "./pages/Panel.jsx";
 import SinAcceso from "./pages/SinAcceso.jsx";
+import Importar from "./pages/Importar.jsx";
+import Etiquetas from "./pages/Etiquetas.jsx";
 
 /** Requiere sesión Y rol. Con sesión pero sin rol (público registrado) -> pantalla "sin acceso". */
 function Privada({ children }) {
@@ -17,11 +19,17 @@ function Privada({ children }) {
   return tieneRol ? children : <SinAcceso />;
 }
 
+/** Solo ADMIN/OFICINA; el operario vuelve al inicio. (El backend igual responde 403.) */
+function SoloStaff({ children }) {
+  const { esStaff } = useAuth();
+  return esStaff ? children : <Navigate to="/" replace />;
+}
+
 function Layout({ children }) {
-  const { user, tieneRol, logout } = useAuth();
+  const { user, tieneRol, esStaff, logout } = useAuth();
   return (
     <>
-      <header className="bg-brand text-white">
+      <header className="bg-brand text-white print:hidden">
         <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 p-3 text-sm">
           <Link to="/" className="mr-auto text-lg font-bold">DC INSTALL</Link>
           {user ? (
@@ -29,6 +37,8 @@ function Layout({ children }) {
               {tieneRol && (
                 <>
                   <Link to="/">Matafuegos</Link>
+                  {esStaff && <Link to="/importar">Importar</Link>}
+                  {esStaff && <Link to="/etiquetas">Etiquetas</Link>}
                   <Link to="/tickets">Soporte</Link>
                   <Link to="/panel">Panel de Control</Link>
                   <Link to="/perfil">{user.first_name || user.username}</Link>
@@ -57,6 +67,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/" element={<Privada><Matafuegos /></Privada>} />
+        <Route path="/importar" element={<Privada><SoloStaff><Importar /></SoloStaff></Privada>} />
+        <Route path="/etiquetas" element={<Privada><SoloStaff><Etiquetas /></SoloStaff></Privada>} />
         <Route path="/tickets" element={<Privada><Tickets /></Privada>} />
         <Route path="/panel" element={<Privada><Panel /></Privada>} />
         <Route path="/perfil" element={<Privada><Perfil /></Privada>} />

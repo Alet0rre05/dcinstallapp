@@ -9,3 +9,4 @@ psycopg[binary]>=3.2
 gunicorn>=22.0
 whitenoise>=6.7
 requests>=2.32
+openpyxl>=3.1,<4.0

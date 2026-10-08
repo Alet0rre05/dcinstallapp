@@ -1,13 +1,15 @@
 from datetime import datetime, time
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django.db.models import Q
+from django.db import IntegrityError, transaction
+from django.db.models import Prefetch, Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException, NotFound, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -16,7 +18,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
+from simple_history.utils import bulk_create_with_history
 
+from . import importacion
 from .audit import MATAFUEGO_CAMPOS, auditar, snapshot
 from .models import (
     Auditoria,
@@ -33,6 +37,7 @@ from .permissions import (
     EscrituraCampo,
     EscrituraStaff,
     SoloAdmin,
+    SoloStaff,
     TieneRol,
     clientes_ids,
     filtrar_por_cliente,
@@ -46,6 +51,7 @@ from .serializers import (
     ClienteSerializer,
     ControlSerializer,
     EquipoUsuarioSerializer,
+    ImportarMatafuegosSerializer,
     MatafuegoPublicoSerializer,
     MatafuegoSerializer,
     MensajeSerializer,
@@ -135,6 +141,9 @@ class ListaGrandePagination(PageNumberPagination):
     page_size = 200
 
 
+ESTADOS = ("BORDO", "ROJO", "AMARILLO", "GRIS", "VERDE")  # de más a menos urgente
+
+
 class ClienteViewSet(viewsets.ModelViewSet):
     serializer_class = ClienteSerializer
     permission_classes = [EscrituraAdmin]
@@ -142,6 +151,42 @@ class ClienteViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return filtrar_por_cliente(Cliente.objects.all(), self.request.user, campo="id")
+
+    @action(detail=False, methods=["get"])
+    def resumen(self, request):
+        """Clientes accesibles al usuario con su cantidad de equipos activos y el
+        conteo por estado. Lista simple (sin paginar). Cantidad fija de consultas
+        (clientes + equipos + controles), sin importar cuántos equipos haya."""
+        clientes = list(self.get_queryset().only("id", "nombre"))
+        equipos = (
+            filtrar_por_cliente(Matafuego.objects.filter(activo=True), request.user)
+            .only("id", "cliente_id", "vencimiento_carga", "vencimiento_ph")
+            .prefetch_related(
+                Prefetch(
+                    "controles",
+                    queryset=Control.objects.only(
+                        "id", "matafuego_id", "fecha", "presion",
+                        "senalizacion", "chapa_baliza", "accesible",
+                    ),
+                )
+            )
+        )
+        por_cliente = {c.id: dict.fromkeys(ESTADOS, 0) for c in clientes}
+        for m in equipos:
+            if m.cliente_id in por_cliente:
+                por_cliente[m.cliente_id][m.estado_color] += 1
+        data = []
+        for c in clientes:
+            conteo = por_cliente[c.id]
+            data.append({
+                "id": c.id,
+                "nombre": c.nombre,
+                "total": sum(conteo.values()),
+                "por_estado": conteo,
+                "vencidos_criticos": conteo["ROJO"] + conteo["BORDO"],
+                "por_vencer": conteo["AMARILLO"],
+            })
+        return Response(data)
 
     def perform_create(self, serializer):
         c = serializer.save()
@@ -158,16 +203,28 @@ class ClienteViewSet(viewsets.ModelViewSet):
 # ---------------------------------------------------------------------------
 # Matafuegos
 # ---------------------------------------------------------------------------
+class MatafuegoPagination(PageNumberPagination):
+    """100 por página por defecto; el front puede pedir hasta 500 con ?page_size=."""
+
+    page_size = 100
+    page_size_query_param = "page_size"
+    max_page_size = 500
+
+
 class MatafuegoViewSet(viewsets.ModelViewSet):
     serializer_class = MatafuegoSerializer
     permission_classes = [EscrituraStaff]
+    pagination_class = MatafuegoPagination
 
     def get_queryset(self):
         qs = Matafuego.objects.select_related("cliente").prefetch_related("controles")
-        qs = filtrar_por_cliente(qs, self.request.user)
+        qs = filtrar_por_cliente(qs, self.request.user)  # scoping: nunca clientes ajenos
         params = self.request.query_params
-        if params.get("cliente"):
-            qs = qs.filter(cliente_id=params["cliente"])
+        cliente = params.get("cliente")
+        if cliente:
+            if not cliente.isdigit() or len(cliente) > 9:
+                raise ValidationError({"cliente": "Cliente inválido."})
+            qs = qs.filter(cliente_id=int(cliente))  # un cliente ajeno da lista vacía
         if self.action == "list" and params.get("incluir_inactivos") != "1":
             qs = qs.filter(activo=True)
         return qs
@@ -218,6 +275,96 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
         Si no tiene permiso el front sigue mostrando la vista pública."""
         m = get_object_or_404(self.get_queryset().filter(activo=True), token_qr=token)
         return Response(self.get_serializer(m).data)
+
+    # -- Carga masiva desde Excel/CSV (solo ADMIN y OFICINA) -----------------------
+    @action(detail=False, methods=["get"], url_path="plantilla-importacion", permission_classes=[SoloStaff])
+    def plantilla_importacion(self, request):
+        """Plantilla .xlsx: hoja «Equipos» con encabezados y un ejemplo + hoja «Instrucciones»."""
+        resp = HttpResponse(
+            importacion.generar_plantilla(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = 'attachment; filename="plantilla_matafuegos.xlsx"'
+        return resp
+
+    @action(
+        detail=False, methods=["post"], url_path="importar",
+        permission_classes=[SoloStaff], parser_classes=[MultiPartParser],
+    )
+    def importar(self, request):
+        """multipart: archivo + cliente + dry_run. Con dry_run solo valida y devuelve el resumen;
+        sin dry_run guarda TODO o NADA (una sola transacción)."""
+        # Corta antes de parsear el cuerpo si ya se sabe que excede el límite
+        try:
+            largo = int(request.META.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            largo = 0
+        if largo > importacion.MAX_BYTES + 64 * 1024:
+            return Response({"detail": "El archivo supera el máximo de 5 MB."},
+                            status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE)
+
+        s = ImportarMatafuegosSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        archivo, dry_run = s.validated_data["archivo"], s.validated_data["dry_run"]
+
+        ids = clientes_ids(request.user)
+        cliente = Cliente.objects.filter(pk=s.validated_data["cliente"]).first()
+        if cliente is None or (ids is not None and cliente.id not in ids):
+            # misma respuesta para "no existe" y "no es tuyo": no se revela cuáles existen
+            raise PermissionDenied("No tenés acceso a ese cliente.")
+
+        try:
+            res = importacion.validar(archivo, cliente)
+        except importacion.ErrorArchivo as exc:
+            return Response({"detail": str(exc)}, status=exc.status)
+
+        resumen = {
+            "archivo": res.archivo,
+            "total_filas": res.total_filas,
+            "validas": res.validas,
+            "con_error": res.con_error,
+            "errores": res.errores[: importacion.MAX_ERRORES_VISIBLES],
+            "errores_totales": len(res.errores),
+            "errores_truncados": len(res.errores) > importacion.MAX_ERRORES_VISIBLES,
+            "muestra": [
+                {k: (str(v) if v is not None else None) if k.startswith("vencimiento") else v
+                 for k, v in fila.items()}
+                for fila in res.filas[:5]
+            ],
+        }
+        if dry_run:
+            return Response({"dry_run": True, **resumen})
+        if res.errores:
+            return Response(
+                {"detail": "El archivo tiene errores: no se guardó nada.", "dry_run": False, **resumen},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        objs = [Matafuego(cliente=cliente, **fila) for fila in res.filas]
+        try:
+            with transaction.atomic():
+                creados = bulk_create_with_history(
+                    objs, Matafuego, batch_size=500,
+                    default_user=request.user, default_change_reason="Importación masiva",
+                )
+                # UNA sola entrada de auditoría por importación (no una por equipo)
+                auditar(request, "IMPORTACION", "Matafuego", "",
+                        f"Importación de {len(creados)} matafuegos ({res.archivo})",
+                        cliente_id=cliente.id,
+                        despues={"archivo": res.archivo, "cliente": cliente.nombre,
+                                 "cantidad": len(creados)})
+        except IntegrityError:
+            # Otra persona cargó las mismas series entre la validación y el guardado
+            return Response(
+                {"detail": "Mientras importabas, otra persona cargó equipos con los mismos números "
+                           "de serie. No se guardó nada: revisá y volvé a intentar."},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(
+            {"dry_run": False, "archivo": res.archivo, "cliente": cliente.id,
+             "creados": len(creados), "ids": [m.pk for m in creados]},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ControlViewSet(

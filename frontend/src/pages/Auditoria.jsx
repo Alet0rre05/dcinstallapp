@@ -4,7 +4,7 @@ import { fechaHora } from "../lib/fmt.js";
 
 const ACCIONES = [
   "REGISTRO", "LOGIN", "CAMBIO_PERFIL", "ASIGNACION_ROL", "REVOCACION_ROL", "ASIGNACION_CLIENTES",
-  "CREACION", "MODIFICACION", "BAJA", "RESTAURACION", "MENSAJE", "CIERRE", "REAPERTURA",
+  "CREACION", "MODIFICACION", "BAJA", "RESTAURACION", "MENSAJE", "CIERRE", "REAPERTURA", "IMPORTACION",
 ];
 
 const valor = (v) => (v === null || v === undefined || v === "" ? "—" : typeof v === "object" ? JSON.stringify(v) : String(v));

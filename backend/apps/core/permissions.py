@@ -70,3 +70,13 @@ class EscrituraCampo(RolPermitido):
 class SoloAdmin(BasePermission):
     def has_permission(self, request, view):
         return rol_de(request.user) == Rol.ADMIN
+
+
+class SoloStaff(BasePermission):
+    """ADMIN u OFICINA para TODOS los métodos (a diferencia de EscrituraStaff, que deja
+    leer a cualquier rol). Para acciones que el operario no debe ni consultar."""
+
+    message = "Esta acción es solo para la oficina o administración."
+
+    def has_permission(self, request, view):
+        return rol_de(request.user) in (Rol.ADMIN, Rol.OFICINA)

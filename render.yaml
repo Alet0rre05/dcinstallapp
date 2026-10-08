@@ -33,6 +33,8 @@ services:
     envVars:
       - key: VITE_API_URL
         sync: false   # ej: https://dcinstall-api.onrender.com/api
+      - key: VITE_PUBLIC_BASE_URL
+        sync: false   # dominio DEFINITIVO que va en los QR impresos, sin barra final (ej: https://app.tudominio.com)
       - key: VITE_TURNSTILE_SITE_KEY
         value: 0x4AAAAAAFOl2XYOw3I1H__t
     routes:

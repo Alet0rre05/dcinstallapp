@@ -1,63 +1,39 @@
-import { useCallback, useEffect, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
+import Combobox from "../lib/Combobox.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
+import FichaMatafuego from "../lib/FichaMatafuego.jsx";
 
-const fecha = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("es-AR") : "—");
+// FormControl vive ahora en lib/; se re-exporta para no romper imports viejos.
+export { FormControl } from "../lib/FormControl.jsx";
 
-export function FormControl({ matafuego, onDone }) {
-  const [f, setF] = useState({
-    presion: "NORMAL", senalizacion: true, chapa_baliza: true, accesible: true,
-    observaciones: "", ubicacion: "", vencimiento_carga: "", vencimiento_ph: "",
-  });
-  const [error, setError] = useState("");
+// Más urgente primero. GRIS (sin datos / nunca controlado) va antes que VERDE.
+const URGENCIA = { BORDO: 0, ROJO: 1, AMARILLO: 2, GRIS: 3, VERDE: 4 };
 
-  const enviar = async (e) => {
-    e.preventDefault();
-    const body = { ...f, matafuego: matafuego.id };
-    ["vencimiento_carga", "vencimiento_ph"].forEach((k) => !body[k] && delete body[k]);
-    try {
-      await api("/controles/", { method: "POST", body });
-      onDone();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const check = (k, label) => (
-    <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.checked })} /> {label}
-    </label>
+const ordenar = (lista) =>
+  [...lista].sort(
+    (a, b) =>
+      (a.activo === b.activo ? 0 : a.activo ? -1 : 1) ||
+      URGENCIA[a.estado_color] - URGENCIA[b.estado_color] ||
+      a.numero_serie.localeCompare(b.numero_serie, "es", { numeric: true })
   );
 
-  return (
-    <form onSubmit={enviar} className="mt-3 space-y-2 rounded border border-slate-200 bg-slate-50 p-3">
-      <p className="text-sm font-semibold">Nuevo control (inmutable una vez guardado)</p>
-      <select className="input" value={f.presion} onChange={(e) => setF({ ...f, presion: e.target.value })}>
-        <option value="BAJA">Presión baja</option>
-        <option value="NORMAL">Presión normal</option>
-        <option value="ALTA">Presión alta</option>
-      </select>
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
-        {check("senalizacion", "Señalización OK")}
-        {check("chapa_baliza", "Chapa/baliza OK")}
-        {check("accesible", "Accesible")}
-      </div>
-      <input className="input" placeholder="Ubicación actual (opcional)" value={f.ubicacion} onChange={(e) => setF({ ...f, ubicacion: e.target.value })} />
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-xs">Nuevo venc. carga<input className="input" type="date" value={f.vencimiento_carga} onChange={(e) => setF({ ...f, vencimiento_carga: e.target.value })} /></label>
-        <label className="text-xs">Nuevo venc. PH<input className="input" type="date" value={f.vencimiento_ph} onChange={(e) => setF({ ...f, vencimiento_ph: e.target.value })} /></label>
-      </div>
-      <textarea className="input" placeholder="Observaciones" value={f.observaciones} onChange={(e) => setF({ ...f, observaciones: e.target.value })} />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="btn">Guardar control</button>
-    </form>
-  );
+/** Trae TODOS los equipos del cliente recorriendo las páginas (data.next). */
+async function cargarEquiposDeCliente(clienteId, incluirBajas) {
+  let todos = [];
+  for (let page = 1; page <= 50; page++) {
+    const q = `cliente=${clienteId}&page_size=500&page=${page}${incluirBajas ? "&incluir_inactivos=1" : ""}`;
+    const data = await api(`/matafuegos/?${q}`);
+    todos = todos.concat(data.results);
+    if (!data.next) break;
+  }
+  return todos;
 }
 
-function FormMatafuego({ clientes, onDone }) {
-  const [f, setF] = useState({ cliente: clientes[0]?.id || "", numero_serie: "", clase: "", ubicacion: "", vencimiento_carga: "", vencimiento_ph: "" });
+function FormMatafuego({ clientes, clienteInicial, onDone }) {
+  const [f, setF] = useState({ cliente: clienteInicial || clientes[0]?.id || "", numero_serie: "", clase: "", ubicacion: "", vencimiento_carga: "", vencimiento_ph: "" });
   const [error, setError] = useState("");
 
   const enviar = async (e) => {
@@ -74,93 +50,213 @@ function FormMatafuego({ clientes, onDone }) {
 
   return (
     <form onSubmit={enviar} className="card mb-4 grid gap-2 sm:grid-cols-3">
-      <select className="input" value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} required>
+      <select className="input min-h-[44px]" value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} required>
         {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
       </select>
-      <input className="input" placeholder="N° de serie" value={f.numero_serie} onChange={(e) => setF({ ...f, numero_serie: e.target.value })} required />
-      <input className="input" placeholder="Clase (ABC, BC…)" value={f.clase} onChange={(e) => setF({ ...f, clase: e.target.value })} />
-      <input className="input sm:col-span-3" placeholder="Ubicación" value={f.ubicacion} onChange={(e) => setF({ ...f, ubicacion: e.target.value })} />
-      <label className="text-xs">Venc. carga<input className="input" type="date" value={f.vencimiento_carga} onChange={(e) => setF({ ...f, vencimiento_carga: e.target.value })} /></label>
-      <label className="text-xs">Venc. PH<input className="input" type="date" value={f.vencimiento_ph} onChange={(e) => setF({ ...f, vencimiento_ph: e.target.value })} /></label>
-      <button className="btn self-end">Agregar matafuego</button>
+      <input className="input min-h-[44px]" placeholder="N° de serie" value={f.numero_serie} onChange={(e) => setF({ ...f, numero_serie: e.target.value })} required />
+      <input className="input min-h-[44px]" placeholder="Clase (ABC, BC…)" value={f.clase} onChange={(e) => setF({ ...f, clase: e.target.value })} />
+      <input className="input min-h-[44px] sm:col-span-3" placeholder="Ubicación" value={f.ubicacion} onChange={(e) => setF({ ...f, ubicacion: e.target.value })} />
+      <label className="text-xs">Venc. carga<input className="input min-h-[44px]" type="date" value={f.vencimiento_carga} onChange={(e) => setF({ ...f, vencimiento_carga: e.target.value })} /></label>
+      <label className="text-xs">Venc. PH<input className="input min-h-[44px]" type="date" value={f.vencimiento_ph} onChange={(e) => setF({ ...f, vencimiento_ph: e.target.value })} /></label>
+      <button className="btn min-h-[44px] self-end">Agregar matafuego</button>
       {error && <p className="text-sm text-red-600 sm:col-span-3">{error}</p>}
     </form>
   );
 }
 
+function TarjetaCliente({ c, onAbrir }) {
+  return (
+    <li>
+      <button
+        onClick={() => onAbrir(c.id)}
+        className="card flex min-h-[72px] w-full items-center gap-3 text-left hover:bg-slate-50"
+      >
+        <span className="mr-auto">
+          <span className="block text-lg font-semibold">{c.nombre}</span>
+          <span className="block text-base text-slate-600">{c.total} {c.total === 1 ? "equipo" : "equipos"}</span>
+          {c.vencidos_criticos > 0 && (
+            <span className="mt-1 block text-base font-semibold text-red-700">
+              ⚠ {c.vencidos_criticos} {c.vencidos_criticos === 1 ? "vencido o crítico" : "vencidos o críticos"}
+            </span>
+          )}
+          {c.por_vencer > 0 && (
+            <span className="block text-base font-semibold text-yellow-700">
+              ● {c.por_vencer} por vencer
+            </span>
+          )}
+        </span>
+        <span aria-hidden="true" className="text-2xl text-slate-400">›</span>
+      </button>
+    </li>
+  );
+}
+
 export default function Matafuegos() {
   const { user, esStaff, esCampo } = useAuth();
-  const [lista, setLista] = useState(null);
-  const [abierto, setAbierto] = useState(null);
-  const [control, setControl] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const clienteParam = params.get("cliente");
+  const equipoParam = params.get("equipo");
+
+  const [resumen, setResumen] = useState(null);
+  const [equipos, setEquipos] = useState(null);
   const [error, setError] = useState("");
   const [verBajas, setVerBajas] = useState(false);
+  const [mostrarAlta, setMostrarAlta] = useState(false);
+  const pedido = useRef(0); // descarta respuestas viejas si se cambia rápido de cliente
 
-  const cargar = useCallback(async () => {
+  const cargarResumen = useCallback(async () => {
     try {
-      const data = await api(`/matafuegos/${verBajas ? "?incluir_inactivos=1" : ""}`);
-      setLista(data.results);
+      setResumen(await api("/clientes/resumen/"));
+      setError("");
     } catch (err) {
       setError(err.message);
     }
-  }, [verBajas]);
+  }, []);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargarResumen(); }, [cargarResumen]);
+
+  // Cliente abierto: solo si realmente está entre los del usuario.
+  const cliente = useMemo(
+    () => resumen?.find((c) => String(c.id) === clienteParam) || null,
+    [resumen, clienteParam]
+  );
+  const clienteId = cliente?.id;
+
+  const cargarEquipos = useCallback(async () => {
+    if (!clienteId) return;
+    const n = ++pedido.current;
+    try {
+      const todos = await cargarEquiposDeCliente(clienteId, verBajas);
+      if (n === pedido.current) { setEquipos(ordenar(todos)); setError(""); }
+    } catch (err) {
+      if (n === pedido.current) setError(err.message);
+    }
+  }, [clienteId, verBajas]);
+
+  useEffect(() => {
+    setEquipos(null);
+    cargarEquipos();
+  }, [cargarEquipos]);
+
+  // Refresca equipos + contadores del cliente abierto, sin tocar la selección.
+  const refrescar = () => { cargarEquipos(); cargarResumen(); };
+
+  const abrirCliente = (id) => { setMostrarAlta(false); setParams({ cliente: String(id) }); };
+  const volver = () => { setVerBajas(false); setMostrarAlta(false); setParams({}); };
+  const elegirEquipo = (m) => setParams({ cliente: String(clienteId), equipo: String(m.id) }, { replace: true });
+
+  const elegido = equipos?.find((m) => String(m.id) === equipoParam) || null;
 
   const baja = async (m) => {
     if (!confirm(`¿Dar de baja el matafuego ${m.numero_serie}?`)) return;
     await api(`/matafuegos/${m.id}/`, { method: "DELETE" });
-    cargar();
+    refrescar();
   };
 
   const restaurar = async (m) => {
     await api(`/matafuegos/${m.id}/restaurar/`, { method: "POST" });
-    cargar();
+    refrescar();
   };
 
-  if (error) return <p className="text-red-600">{error}</p>;
-  if (!lista) return <p>Cargando…</p>;
+  if (error && !resumen) {
+    return (
+      <div className="space-y-2">
+        <p className="text-red-600">{error}</p>
+        <button className="btn min-h-[44px]" onClick={cargarResumen}>Reintentar</button>
+      </div>
+    );
+  }
+  if (!resumen) return <p>Cargando…</p>;
 
-  const urlQR = (m) => `${window.location.origin}/qr/${m.token_qr}`;
+  // -- Paso 1: lista de clientes -------------------------------------------
+  if (!cliente) {
+    return (
+      <div>
+        <h1 className="mb-1 text-xl font-bold">Elegí un cliente</h1>
+        <p className="mb-3 text-base text-slate-600">Tocá el cliente para ver sus matafuegos.</p>
+        {resumen.length === 0 && (
+          <p className="text-slate-500">Todavía no tenés clientes asignados. Pedile a la oficina que te asigne uno.</p>
+        )}
+        <ul className="space-y-3">
+          {resumen.map((c) => <TarjetaCliente key={c.id} c={c} onAbrir={abrirCliente} />)}
+        </ul>
+      </div>
+    );
+  }
 
+  // -- Pasos 2 y 3: equipos del cliente y ficha ---------------------------------
   return (
-    <div>
-      <div className="mb-3 flex items-center gap-3">
-        <h1 className="mr-auto text-xl font-bold">Matafuegos</h1>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn-sec min-h-[44px]" onClick={volver}>← Clientes</button>
+        <h1 className="mr-auto text-xl font-bold">{cliente.nombre}</h1>
         {esStaff && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={verBajas} onChange={(e) => setVerBajas(e.target.checked)} /> Ver bajas
+          <label className="flex min-h-[44px] items-center gap-2 text-base">
+            <input type="checkbox" className="h-5 w-5" checked={verBajas} onChange={(e) => setVerBajas(e.target.checked)} /> Ver bajas
           </label>
         )}
       </div>
-      {esStaff && user.clientes.length > 0 && <FormMatafuego clientes={user.clientes} onDone={cargar} />}
-      {lista.length === 0 && <p className="text-slate-500">No hay matafuegos para mostrar. Si tu cuenta es nueva, pedile a la oficina que te asigne un cliente.</p>}
-      <ul className="space-y-3">
-        {lista.map((m) => (
-          <li key={m.id} className="card">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="mr-auto">
-                <p className="font-semibold">{m.numero_serie} {!m.activo && <span className="rounded bg-slate-200 px-1 text-xs">BAJA</span>} <span className="text-sm font-normal text-slate-500">· {m.cliente_nombre}</span></p>
-                <p className="text-sm text-slate-500">{m.clase || "—"} · {m.ubicacion || "Sin ubicación"}</p>
-                <p className="text-xs text-slate-500">Carga: {fecha(m.vencimiento_carga)} · PH: {fecha(m.vencimiento_ph)}</p>
-              </div>
+
+      {esStaff && (
+        <>
+          <button className="btn-sec min-h-[44px]" onClick={() => setMostrarAlta(!mostrarAlta)}>
+            {mostrarAlta ? "Cerrar alta" : "+ Agregar matafuego"}
+          </button>
+          {mostrarAlta && (
+            <FormMatafuego
+              clientes={user.clientes}
+              clienteInicial={cliente.id}
+              onDone={() => { setMostrarAlta(false); refrescar(); }}
+            />
+          )}
+        </>
+      )}
+
+      {error && (
+        <p className="text-red-600">
+          {error} <button className="underline" onClick={refrescar}>Reintentar</button>
+        </p>
+      )}
+      {!equipos && !error && <p>Cargando equipos…</p>}
+      {equipos && equipos.length === 0 && (
+        <p className="text-slate-500">Este cliente todavía no tiene matafuegos cargados.</p>
+      )}
+      {equipos && equipos.length > 0 && (
+        <Combobox
+          label={`Elegí un matafuego (${equipos.length})`}
+          placeholder="Buscá por n° de serie o ubicación"
+          vacio="No hay ningún matafuego con ese dato"
+          items={equipos}
+          selected={elegido}
+          getKey={(m) => m.id}
+          searchText={(m) => `${m.numero_serie} ${m.ubicacion} ${m.clase}`}
+          inputLabel={(m) => `N° ${m.numero_serie}${m.ubicacion ? ` · ${m.ubicacion}` : ""}`}
+          onSelect={elegirEquipo}
+          renderItem={(m) => (
+            <span className="flex items-center gap-3">
+              <span className="mr-auto min-w-0">
+                <span className="block text-base font-semibold">
+                  N° {m.numero_serie} {!m.activo && <span className="rounded bg-slate-200 px-1 text-xs font-normal">BAJA</span>}
+                </span>
+                <span className="block truncate text-sm text-slate-600">{m.ubicacion || "Sin ubicación"}</span>
+              </span>
               <EstadoBadge estado={m.estado_color} />
-              <button className="btn-sec" onClick={() => setAbierto(abierto === m.id ? null : m.id)}>QR</button>
-              {esCampo && m.activo && <button className="btn-sec" onClick={() => setControl(control === m.id ? null : m.id)}>Controlar</button>}
-              {esStaff && m.activo && <button className="btn-sec text-red-700" onClick={() => baja(m)}>Baja</button>}
-              {esStaff && !m.activo && <button className="btn-sec" onClick={() => restaurar(m)}>Restaurar</button>}
-            </div>
-            {m.problemas.length > 0 && <p className="mt-2 text-xs text-red-700">⚠ {m.problemas.join(" · ")}</p>}
-            {abierto === m.id && (
-              <div className="mt-3 flex flex-col items-center gap-1">
-                <QRCodeSVG value={urlQR(m)} size={160} />
-                <a className="break-all text-xs text-brand underline" href={urlQR(m)} target="_blank" rel="noreferrer">{urlQR(m)}</a>
-              </div>
-            )}
-            {control === m.id && <FormControl matafuego={m} onDone={() => { setControl(null); cargar(); }} />}
-          </li>
-        ))}
-      </ul>
+            </span>
+          )}
+        />
+      )}
+
+      {elegido && (
+        <FichaMatafuego
+          key={elegido.id}
+          m={elegido}
+          esStaff={esStaff}
+          esCampo={esCampo}
+          onBaja={baja}
+          onRestaurar={restaurar}
+          onControlado={refrescar}
+        />
+      )}
     </div>
   );
 }
