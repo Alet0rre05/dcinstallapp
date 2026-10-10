@@ -14,5 +14,77 @@
   .btn-sec { @apply inline-flex items-center justify-center rounded border border-slate-300 bg-white px-3 py-2 text-base text-ink hover:border-brand-dark hover:bg-brand-light active:bg-brand/40 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-slate-300; }
   .card { @apply rounded-lg border border-brand/60 bg-white p-4 shadow-sm; }
   .link { @apply font-semibold text-brand-dark underline underline-offset-2 hover:text-brand-darker; }
+  /* Botones de las funciones nuevas (acento índigo). Mismo tamaño táctil de 44 px que .btn */
+  .btn-acento { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-acento px-4 py-2 text-base font-semibold text-white transition-colors duration-200 hover:bg-acento-dark active:bg-acento-darker focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:bg-acento dark:bg-acento-btn dark:hover:bg-acento dark:active:bg-acento-dark dark:disabled:hover:bg-acento-btn dark:focus-visible:ring-acento-soft dark:focus-visible:ring-offset-slate-900; }
+  .btn-acento-sec { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-acento bg-white px-3 py-2 text-base font-semibold text-acento transition-colors duration-200 hover:bg-acento-light active:bg-acento/20 focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:bg-white dark:border-acento-soft dark:bg-slate-800 dark:text-acento-soft dark:hover:bg-acento-deep dark:active:bg-acento-deep dark:disabled:hover:bg-slate-800 dark:focus-visible:ring-acento-soft dark:focus-visible:ring-offset-slate-900; }
   .skeleton { @apply animate-pulse rounded bg-brand/30 motion-reduce:animate-none; }
+}
+
+/* ------------------------------------------------------------------------------------------
+   MODO OSCURO (clase "dark" en <html>). Capa de compatibilidad: re-pinta las utilidades que ya
+   usan las pantallas existentes, sin tocar sus componentes. Fondos base slate-900, contenedores
+   slate-800 (nunca negro puro). Solo en pantalla: al imprimir (etiquetas) siempre sale en claro.
+   ------------------------------------------------------------------------------------------ */
+@media screen {
+  html.dark { color-scheme: dark; }
+  .dark body { background-color: #0f172a; color: #e2e8f0; }
+  .dark :focus-visible { outline-color: #7dd3fc; }
+
+  /* superficies */
+  .dark .card { background-color: #1e293b; border-color: rgba(100, 220, 244, 0.25); }
+  .dark .bg-white,
+  .dark .hover\:bg-white:hover,
+  .dark .active\:bg-white:active { background-color: #1e293b; }
+  .dark .bg-white\/70,
+  .dark .hover\:bg-white\/60:hover,
+  .dark .active\:bg-white\/80:active { background-color: rgba(30, 41, 59, 0.7); }
+  .dark .bg-slate-50 { background-color: #18243a; }
+  .dark .bg-slate-100 { background-color: #334155; }
+  .dark .bg-slate-200 { background-color: #475569; }
+  .dark .bg-brand { background-color: #0e3b4d; }
+  .dark .bg-brand-light,
+  .dark .hover\:bg-brand-light:hover { background-color: #0e2f3d; }
+  .dark .active\:bg-brand\/30:active,
+  .dark .active\:bg-brand\/40:active { background-color: rgba(100, 220, 244, 0.18); }
+  .dark .skeleton { background-color: rgba(148, 163, 184, 0.22); }
+  .dark .bg-ink { background-color: #7dd3fc; color: #0b2e3f; }
+  .dark .bg-ink.\!text-white { color: #0b2e3f !important; }
+  .dark .bg-red-50 { background-color: #3b1d22; }
+  .dark .bg-amber-50 { background-color: #3a2f0e; }
+
+  /* campos y botones secundarios */
+  .dark .input { background-color: #0f172a; color: #f1f5f9; border-color: #475569; }
+  .dark .input::placeholder { color: #94a3b8; }
+  .dark .btn-sec { background-color: #1e293b; color: #f1f5f9; border-color: #475569; }
+  .dark .btn-sec:hover { background-color: #0e2f3d; border-color: #7dd3fc; }
+  .dark .btn-sec:disabled:hover { background-color: #1e293b; border-color: #475569; }
+  .dark .btn { background-color: #0b6b87; }
+  .dark .btn:hover { background-color: #0e86a8; }
+
+  /* texto */
+  .dark .text-ink,
+  .dark .text-slate-800,
+  .dark .text-slate-900 { color: #e2e8f0; }
+  .dark .text-slate-700 { color: #cbd5e1; }
+  .dark .text-slate-600 { color: #b6c2d2; }
+  .dark .text-slate-500,
+  .dark .text-slate-400 { color: #94a3b8; }
+  .dark .text-brand-dark,
+  .dark .link { color: #7dd3fc; }
+  .dark .link:hover { color: #bae6fd; }
+  .dark .text-red-600,
+  .dark .text-red-700 { color: #fca5a5; }
+  .dark .text-green-700 { color: #86efac; }
+  .dark .text-yellow-700 { color: #fde047; }
+  .dark .text-amber-900 { color: #fde68a; }
+
+  /* bordes */
+  .dark .border-slate-100,
+  .dark .border-slate-200 { border-color: #334155; }
+  .dark .border-slate-300 { border-color: #475569; }
+  .dark .border-red-200,
+  .dark .border-red-300 { border-color: #7f1d1d; }
+  .dark .border-amber-400 { border-color: #b45309; }
+  .dark .border-brand\/60 { border-color: rgba(100, 220, 244, 0.25); }
+  .dark .border-brand-dark { border-color: #7dd3fc; }
 }

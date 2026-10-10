@@ -1,5 +1,36 @@
 # Changelog
 
+## 2.5.0
+
+### Agregado
+- **Dashboard de vencimientos** (`/dashboard`, todos los roles con rol): indicadores (equipos activos, vencidos, por vencer, sin revisar), gráfico de cargas y PH por mes (3, 6 o 12 meses, con tabla equivalente para lectores de pantalla), reparto por estado y tabla de próximos vencimientos con encabezado fijo. Filtro por cliente (también por `?cliente=`). Usa `GET /api/dashboard/vencimientos/`.
+- **Remito en PDF** al cerrar un ticket: botón "Descargar remito (PDF)" en los tickets cerrados (`GET /api/tickets/<id>/remito/`). El PDF se genera sin librerías externas.
+- **Campana de avisos** en la barra superior: contador de no leídos (se actualiza cada minuto y al volver a la pestaña, conserva el último valor si no hay red), panel con lista, "Marcar todos como leídos" y aviso con vibración cuando llega uno nuevo. Avisos de mensajes de tickets, cierres/reaperturas y resumen semanal de vencimientos. Modelo `Notificacion` (migración `0002_notificacion`).
+- **Modo oscuro**: botón luna/sol en la barra superior; se recuerda en el navegador y, si nunca se eligió, sigue la preferencia del sistema. Fondos `slate-900`/`slate-800` (nunca negro puro). Las etiquetas QR siempre se imprimen en claro.
+- **Color de acento** `acento` (azul índigo) para las funciones nuevas y la Tutoría, distinto de los celestes que ya usan los botones existentes. Clases `.btn-acento` y `.btn-acento-sec` (alto táctil de 44 px).
+- Vibración de confirmación (`lib/haptico.js`) al cerrar un ticket, descargar un remito, guardar un control y completar una guía.
+- Tutoría: 4 guías nuevas (dashboard, remito, avisos, modo oscuro) y rediseño con el acento, insignias con ícono y modo oscuro.
+
+### Cambiado
+- `tailwind.config.js`: `darkMode: "class"` y paleta `acento`. `index.css`: capa de compatibilidad para el modo oscuro que re-pinta las utilidades existentes (solo en pantalla); no se modificó ninguna otra pantalla salvo `Tickets.jsx` (botón de remito) y `FormControl.jsx` (vibración).
+- `App.jsx`: rutas y enlaces nuevos. Nada de lo anterior cambió de lugar.
+
+### Notas de actualización
+- **Hay una migración nueva** (`0002_notificacion`): correr `python manage.py migrate`.
+- Sin dependencias nuevas (ni `pip` ni `npm`).
+- Los tests del backend de esta versión están en `apps/core/tests_v24.py` (`DEBUG=1 python manage.py test`).
+
+## 2.4.0
+
+### Agregado
+- **Tutoría** (`/tutoria`): 16 guías paso a paso de todo lo que se puede hacer en la app, filtradas por rol (público, Operario, Oficina, Administrador). Cada guía tiene barra de progreso, navegación Anterior/Siguiente, pasos marcables y un botón para ir a la pantalla correspondiente. Casilla "Ver también las guías de otros roles".
+- Enlace "Tutoría" en la barra superior (visible también sin sesión y para cuentas sin rol) y en la pantalla "Cuenta sin rol asignado".
+- El contenido vive en `frontend/src/lib/tutoriaContenido.js`: para agregar o corregir una guía solo se edita ese archivo.
+
+### Notas de actualización
+- Solo frontend: sin migraciones, sin cambios en la API y sin dependencias nuevas.
+- El progreso de cada guía se guarda en el navegador de cada persona (localStorage, por usuario).
+
 ## 2.3.0
 
 ### Agregado

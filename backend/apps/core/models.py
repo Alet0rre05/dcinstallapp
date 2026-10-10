@@ -326,3 +326,40 @@ class Auditoria(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Los registros de auditoría no pueden eliminarse.")
+
+
+# ---------------------------------------------------------------------------
+# Notificaciones internas (campana de la app)
+# ---------------------------------------------------------------------------
+class Notificacion(models.Model):
+    """Aviso para un usuario. `clave` evita duplicados (ej. resumen semanal de vencimientos)."""
+
+    class Tipo(models.TextChoices):
+        TICKET_MENSAJE = "TICKET_MENSAJE", "Mensaje en un ticket"
+        TICKET_CERRADO = "TICKET_CERRADO", "Ticket cerrado"
+        TICKET_REABIERTO = "TICKET_REABIERTO", "Ticket reabierto"
+        VENCIMIENTOS = "VENCIMIENTOS", "Vencimientos"
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notificaciones"
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    titulo = models.CharField(max_length=80)
+    mensaje = models.CharField(max_length=255, blank=True)
+    enlace = models.CharField(max_length=200, blank=True)  # ruta del front, ej. /tickets
+    clave = models.CharField(max_length=80, blank=True)
+    leida = models.BooleanField(default=False, db_index=True)
+    creada = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-creada", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "clave"],
+                condition=~models.Q(clave=""),
+                name="uniq_notif_clave_por_usuario",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} · {self.titulo}"

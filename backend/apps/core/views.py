@@ -20,7 +20,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from simple_history.utils import bulk_create_with_history
 
-from . import importacion
+from . import importacion, notificaciones, remito
 from .audit import MATAFUEGO_CAMPOS, auditar, snapshot
 from .models import (
     Auditoria,
@@ -29,6 +29,7 @@ from .models import (
     LimiteMensajesExcedido,
     Matafuego,
     MensajeChat,
+    Notificacion,
     Rol,
     TicketSoporte,
 )
@@ -434,6 +435,12 @@ class LimiteMensajes(APIException):
     default_code = "limite_mensajes"
 
 
+class RemitoNoDisponible(APIException):
+    status_code = 400
+    default_detail = "El remito se genera cuando el ticket está cerrado."
+    default_code = "remito_no_disponible"
+
+
 def _es_soporte(user):
     return rol_de(user) in (Rol.ADMIN, Rol.OFICINA)
 
@@ -479,6 +486,14 @@ class TicketViewSet(
         ticket.save(update_fields=["estado"])
         auditar(request, accion, "Ticket", ticket.pk, ticket.titulo, cliente_id=ticket.cliente_id,
                 antes={"estado": antes}, despues={"estado": nuevo})
+        if nuevo == TicketSoporte.Estado.CERRADO:
+            notificaciones.notificar_ticket(
+                ticket, request.user, Notificacion.Tipo.TICKET_CERRADO,
+                f"Ticket cerrado: {ticket.titulo}", "Ya podés descargar el remito en PDF.")
+        else:
+            notificaciones.notificar_ticket(
+                ticket, request.user, Notificacion.Tipo.TICKET_REABIERTO,
+                f"Ticket reabierto: {ticket.titulo}")
         return Response(self.get_serializer(ticket).data)
 
     @action(detail=True, methods=["post"])
@@ -488,6 +503,16 @@ class TicketViewSet(
     @action(detail=True, methods=["post"])
     def reabrir(self, request, pk=None):
         return self._cambiar_estado(request, TicketSoporte.Estado.ABIERTO, "REAPERTURA")
+
+    @action(detail=True, methods=["get"])
+    def remito(self, request, pk=None):
+        """Remito en PDF de un ticket CERRADO. El alcance (cliente / operario) lo da get_queryset."""
+        ticket = self.get_object()
+        if ticket.estado != TicketSoporte.Estado.CERRADO:
+            raise RemitoNoDisponible()
+        respuesta = HttpResponse(remito.generar_para_ticket(ticket), content_type="application/pdf")
+        respuesta["Content-Disposition"] = f'attachment; filename="remito-{remito.numero_remito(ticket)}.pdf"'
+        return respuesta
 
     @action(detail=True, methods=["get", "post"])
     def mensajes(self, request, pk=None):
@@ -520,6 +545,9 @@ class TicketViewSet(
             )
             auditar(request, "MENSAJE", "Ticket", ticket.pk, ticket.titulo,
                     cliente_id=ticket.cliente_id, despues={"mensaje_id": mensaje.pk})
+            notificaciones.notificar_ticket(
+                ticket, request.user, Notificacion.Tipo.TICKET_MENSAJE,
+                f"Nuevo mensaje: {ticket.titulo}", mensaje.texto[:120])
         return Response(MensajeSerializer(mensaje).data, status=status.HTTP_201_CREATED)
 
 

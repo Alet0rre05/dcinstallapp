@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "../lib/auth.jsx";
 
 /** Pantalla para "Público registrado": cuenta válida pero sin rol. */
@@ -13,6 +14,7 @@ export default function SinAcceso() {
       <p className="text-xs text-slate-500">
         Si solo querés consultar un matafuego, escaneá su código QR: la vista pública no requiere cuenta.
       </p>
+      <p className="text-sm"><Link className="link" to="/tutoria">Ver la Tutoría: cómo funciona la app</Link></p>
       <button className="btn" onClick={logout}>Salir</button>
     </div>
   );
