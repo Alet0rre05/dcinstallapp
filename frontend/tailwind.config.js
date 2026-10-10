@@ -10,7 +10,7 @@ export default {
         //   brand-dark sobre blanco 6.1:1 · brand-dark sobre brand-light 5.6:1
         // El texto blanco NO se usa sobre brand (#64DCF4): no se lee.
         brand: {
-          DEFAULT: "#64DCF4", // base: navbar, panel, acentos
+          DEFAULT: "#151E45", // base: navbar, panel, acentos
           dark: "#0B6B87",    // botones llenos, links, foco
           darker: "#08526A",  // hover / active de botones
           light: "#E8FAFE",   // fondos suaves, hover
