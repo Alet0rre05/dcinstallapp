@@ -58,6 +58,15 @@ Cada matafuego tiene un `token_qr` (UUID inmutable). El QR apunta a `/qr/<token>
 - Con rol y cliente asignado: la misma ficha con **Nuevo control** (todos los roles) y **Editar ficha** (OFICINA/ADMIN).
 - Los controles son inmutables y actualizan ubicación/vencimientos del matafuego.
 
+## V2.5
+
+Dashboard de vencimientos, remito en PDF de tickets cerrados, campana de avisos y modo oscuro, con un color de acento propio (`acento`, azul índigo) para no repetir los de los botones existentes. Detalle y notas de actualización (hay una migración nueva) en [CHANGELOG.md](CHANGELOG.md).
+
+## V2.4
+
+### Tutoría
+Pantalla `/tutoria` con guías paso a paso por rol. Para editar o sumar guías, modificá `frontend/src/lib/tutoriaContenido.js` (cada guía lleva `id`, `titulo`, `resumen`, `roles`, `ruta` opcional y la lista de `pasos`). Detalle en [CHANGELOG.md](CHANGELOG.md).
+
 ## V2.3
 
 Novedades de la versión 2.3.0 (detalle en [CHANGELOG.md](CHANGELOG.md)).
