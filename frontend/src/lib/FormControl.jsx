@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "./api.js";
+import { vibrar } from "./haptico.js";
 
 /** Formulario "Nuevo control". Lo usan la ficha de Matafuegos y el escaneo de QR (ScanQR). */
 export function FormControl({ matafuego, onDone }) {
@@ -15,6 +16,7 @@ export function FormControl({ matafuego, onDone }) {
     ["vencimiento_carga", "vencimiento_ph"].forEach((k) => !body[k] && delete body[k]);
     try {
       await api("/controles/", { method: "POST", body });
+      vibrar(40); // confirmación háptica: el control quedó guardado
       onDone();
     } catch (err) {
       setError(err.message);

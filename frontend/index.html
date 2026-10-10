@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Aplica el modo oscuro antes de pintar (evita el parpadeo blanco). Ver src/lib/tema.jsx.
+      try {
+        var t = localStorage.getItem("dci_tema");
+        if (t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    </script>
     <title>DC INSTALL · Control de matafuegos</title>
     <meta name="theme-color" content="#64DCF4" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-pez-32.png" />

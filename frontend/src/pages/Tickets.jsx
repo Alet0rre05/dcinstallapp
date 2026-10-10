@@ -3,6 +3,7 @@ import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
 import EstadoVacio from "../lib/EstadoVacio.jsx";
 import { ListaSkeleton } from "../lib/Skeleton.jsx";
+import { vibrar } from "../lib/haptico.js";
 
 function Chat({ ticket, onChange }) {
   const { user } = useAuth();
@@ -31,7 +32,31 @@ function Chat({ ticket, onChange }) {
 
   const cambiarEstado = async (accion) => {
     await api(`/tickets/${ticket.id}/${accion}/`, { method: "POST" });
+    if (accion === "cerrar") vibrar([40, 30, 40]); // confirmación háptica al completar el ticket
     onChange();
+  };
+
+  // Remito en PDF (solo tickets cerrados): se descarga como archivo
+  const [bajando, setBajando] = useState(false);
+  const descargarRemito = async () => {
+    setBajando(true);
+    setError("");
+    try {
+      const blob = await api(`/tickets/${ticket.id}/remito/`, { blob: true });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `remito-R-${String(ticket.id).padStart(6, "0")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      vibrar(40);
+    } catch (err) {
+      setError(err.message || "No pudimos generar el remito. Probá de nuevo.");
+    } finally {
+      setBajando(false);
+    }
   };
 
   const cerrado = ticket.estado === "CERRADO";
@@ -56,9 +81,17 @@ function Chat({ ticket, onChange }) {
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
       <div className="mt-2">
         {cerrado ? (
-          <button className="btn-sec" onClick={() => cambiarEstado("reabrir")}>Reabrir</button>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-acento" onClick={descargarRemito} disabled={bajando}>
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v12M7 11l5 5 5-5M5 21h14" />
+              </svg>
+              {bajando ? "Generando remito…" : "Descargar remito (PDF)"}
+            </button>
+            <button className="btn-sec min-h-[44px]" onClick={() => cambiarEstado("reabrir")}>Reabrir</button>
+          </div>
         ) : (
-          <button className="btn-sec" onClick={() => cambiarEstado("cerrar")}>Cerrar ticket</button>
+          <button className="btn-sec min-h-[44px]" onClick={() => cambiarEstado("cerrar")}>Cerrar ticket</button>
         )}
         <span className="ml-3 text-xs text-slate-500">{user.rol === "OPERARIO" ? "Máx. 3 mensajes seguidos" : "Máx. 10 mensajes seguidos"}</span>
       </div>

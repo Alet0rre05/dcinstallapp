@@ -13,6 +13,10 @@ import Panel from "./pages/Panel.jsx";
 import SinAcceso from "./pages/SinAcceso.jsx";
 import Importar from "./pages/Importar.jsx";
 import Etiquetas from "./pages/Etiquetas.jsx";
+import Tutoria from "./pages/Tutoria.jsx";
+import Dashboard from "./pages/Dashboard.jsx";
+import Notificaciones from "./lib/Notificaciones.jsx";
+import BotonTema from "./lib/tema.jsx";
 
 /** Requiere sesión Y rol. Con sesión pero sin rol (público registrado) -> pantalla "sin acceso". */
 function Privada({ children }) {
@@ -50,6 +54,8 @@ function Layout({ children }) {
           <Link to="/" onClick={cerrar} className="mr-auto flex min-h-[44px] items-center rounded">
             <Logo />
           </Link>
+          {tieneRol && <Notificaciones />}
+          <BotonTema />
           <button
             type="button"
             className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded border-2 border-ink px-3 text-base font-bold text-ink hover:bg-white/60 md:hidden"
@@ -69,6 +75,7 @@ function Layout({ children }) {
                 {tieneRol && (
                   <>
                     {enlace("/", "Matafuegos")}
+                    {enlace("/dashboard", "Dashboard")}
                     {esStaff && enlace("/importar", "Importar")}
                     {esStaff && enlace("/etiquetas", "Etiquetas")}
                     {enlace("/tickets", "Soporte")}
@@ -76,12 +83,14 @@ function Layout({ children }) {
                     {enlace("/perfil", user.first_name || user.username)}
                   </>
                 )}
+                {enlace("/tutoria", "Tutoría")}
                 <li>
                   <button onClick={() => { cerrar(); logout(); }} className={`${ITEM} w-full underline md:w-auto`}>Salir</button>
                 </li>
               </>
             ) : (
               <>
+                {enlace("/tutoria", "Tutoría")}
                 {enlace("/login", "Ingresar")}
                 {enlace("/registro", "Registrarse")}
               </>
@@ -99,11 +108,13 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/qr/:token" element={<ScanQR />} />
+        <Route path="/tutoria" element={<Tutoria />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
         <Route path="/" element={<Privada><Matafuegos /></Privada>} />
         <Route path="/importar" element={<Privada><SoloStaff><Importar /></SoloStaff></Privada>} />
         <Route path="/etiquetas" element={<Privada><SoloStaff><Etiquetas /></SoloStaff></Privada>} />
+        <Route path="/dashboard" element={<Privada><Dashboard /></Privada>} />
         <Route path="/tickets" element={<Privada><Tickets /></Privada>} />
         <Route path="/panel" element={<Privada><Panel /></Privada>} />
         <Route path="/perfil" element={<Privada><Perfil /></Privada>} />
