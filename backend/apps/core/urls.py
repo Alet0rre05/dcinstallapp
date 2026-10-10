@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from . import views
+from . import dashboard, notificaciones, views
 
 router = DefaultRouter()
 router.register("clientes", views.ClienteViewSet, basename="cliente")
@@ -20,5 +20,9 @@ urlpatterns = [
     path("equipo/revocar-rol/", views.RevocarRolView.as_view(), name="equipo-revocar"),
     path("equipo/asignar-clientes/", views.AsignarClientesView.as_view(), name="equipo-clientes"),
     path("auditoria/", views.AuditoriaListView.as_view(), name="auditoria"),
+    path("dashboard/vencimientos/", dashboard.DashboardVencimientosView.as_view(), name="dashboard-vencimientos"),
+    path("notificaciones/", notificaciones.NotificacionListView.as_view(), name="notificaciones"),
+    path("notificaciones/contador/", notificaciones.NotificacionContadorView.as_view(), name="notificaciones-contador"),
+    path("notificaciones/leer/", notificaciones.NotificacionLeerView.as_view(), name="notificaciones-leer"),
     path("public/qr/<uuid:token>/", views.QRPublicoView.as_view(), name="qr-publico"),
 ] + router.urls

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from simple_history.admin import SimpleHistoryAdmin
 
-from .models import Auditoria, Cliente, Control, Matafuego, MensajeChat, Perfil, TicketSoporte
+from .models import Auditoria, Cliente, Control, Matafuego, MensajeChat, Notificacion, Perfil, TicketSoporte
 
 
 @admin.register(Cliente)
@@ -69,3 +69,10 @@ class AuditoriaAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Notificacion)
+class NotificacionAdmin(admin.ModelAdmin):
+    list_display = ("creada", "usuario", "tipo", "titulo", "leida")
+    list_filter = ("tipo", "leida")
+    search_fields = ("usuario__username", "titulo")
