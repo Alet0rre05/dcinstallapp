@@ -162,3 +162,8 @@ Tabla `Auditoria` inmutable (no se edita ni se borra): fecha/hora (se muestra en
 - **La clave secreta de Turnstile no está en el código**: va solo en `TURNSTILE_SECRET_KEY`. Como se compartió en un documento de texto, conviene regenerarla en el panel de Cloudflare.
 - django-axes no soporta una ventana de 3 minutos para contar los intentos; aplica 5 fallos → bloqueo de IP por 30 min.
 - El throttle de DRF usa la caché local de cada proceso; con varios workers el límite se aplica por worker.
+
+
+## Aplicación móvil Android
+
+La aplicación Android con controles offline y guía para generar el APK instalable está en [ANDROID.md](ANDROID.md).
