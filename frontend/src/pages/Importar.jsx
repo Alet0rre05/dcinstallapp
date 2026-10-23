@@ -104,7 +104,7 @@ export default function Importar() {
 
       <section className="card space-y-2">
         <h2 className="text-base font-semibold">2. Descargá la plantilla</h2>
-        <p className="text-sm text-slate-600">Completala (una fila por matafuego) y borrá la fila de ejemplo.</p>
+        <p className="text-sm text-slate-600">Es la misma planilla de extintores que se descarga en Planillas, en blanco. Completá una fila por matafuego desde la fila 4.</p>
         <button className="btn-sec min-h-[44px]" onClick={descargarPlantilla}>Descargar plantilla (.xlsx)</button>
       </section>
 
@@ -151,7 +151,7 @@ export default function Importar() {
 
           {detalle.muestra?.length > 0 && (
             <div className="overflow-x-auto">
-              <p className="mb-1 text-sm text-slate-600">Primeras filas válidas (revisá que no haya quedado la fila de ejemplo):</p>
+              <p className="mb-1 text-sm text-slate-600">Primeras filas válidas:</p>
               <table className="w-full text-left text-sm">
                 <thead><tr className="border-b"><th className="pr-3">N° de serie</th><th className="pr-3">Clase</th><th className="pr-3">Ubicación</th><th className="pr-3">Carga</th><th>PH</th></tr></thead>
                 <tbody>

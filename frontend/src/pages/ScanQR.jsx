@@ -13,12 +13,13 @@ const fecha = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("es-AR") 
 function FormEditar({ m, onDone }) {
   const [f, setF] = useState({
     clase: m.clase || "", ubicacion: m.ubicacion || "",
+    marca: m.marca || "", anio_fabricacion: m.anio_fabricacion || "", agente: m.agente || "", capacidad: m.capacidad || "",
     vencimiento_carga: m.vencimiento_carga || "", vencimiento_ph: m.vencimiento_ph || "",
   });
   const [error, setError] = useState("");
   const enviar = async (e) => {
     e.preventDefault();
-    const body = { ...f, vencimiento_carga: f.vencimiento_carga || null, vencimiento_ph: f.vencimiento_ph || null };
+    const body = { ...f, anio_fabricacion: f.anio_fabricacion || null, vencimiento_carga: f.vencimiento_carga || null, vencimiento_ph: f.vencimiento_ph || null };
     try {
       await api(`/matafuegos/${m.id}/`, { method: "PATCH", body });
       onDone();
@@ -31,6 +32,15 @@ function FormEditar({ m, onDone }) {
       <p className="text-sm font-semibold">Editar ficha</p>
       <input className="input" placeholder="Clase" value={f.clase} onChange={(e) => setF({ ...f, clase: e.target.value })} />
       <input className="input" placeholder="Ubicación" value={f.ubicacion} onChange={(e) => setF({ ...f, ubicacion: e.target.value })} />
+      <div className="grid grid-cols-2 gap-2">
+      <input className="input" placeholder="Marca" maxLength={60} value={f.marca} onChange={(e) => setF({ ...f, marca: e.target.value })} />
+      <input className="input" placeholder="Año de fabricación" type="number" inputMode="numeric" min={1950} max={new Date().getFullYear() + 1} value={f.anio_fabricacion} onChange={(e) => setF({ ...f, anio_fabricacion: e.target.value })} />
+      <input className="input" placeholder="Agente (POLVO, CO2…)" list="agentes-extintores" maxLength={30} value={f.agente} onChange={(e) => setF({ ...f, agente: e.target.value })} />
+      <input className="input" placeholder="Capacidad (ej. 5 KG)" maxLength={20} value={f.capacidad} onChange={(e) => setF({ ...f, capacidad: e.target.value })} />
+      <datalist id="agentes-extintores">
+        {["POLVO", "HCFC", "CO2", "ESPUMA", "AGUA"].map((a) => <option key={a} value={a} />)}
+      </datalist>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-xs">Venc. carga<input className="input" type="date" value={f.vencimiento_carga} onChange={(e) => setF({ ...f, vencimiento_carga: e.target.value })} /></label>
         <label className="text-xs">Venc. PH<input className="input" type="date" value={f.vencimiento_ph} onChange={(e) => setF({ ...f, vencimiento_ph: e.target.value })} /></label>

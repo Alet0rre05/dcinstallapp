@@ -36,13 +36,13 @@ async function cargarEquiposDeCliente(clienteId, incluirBajas) {
 }
 
 function FormMatafuego({ clientes, clienteInicial, onDone }) {
-  const [f, setF] = useState({ cliente: clienteInicial || clientes[0]?.id || "", numero_serie: "", clase: "", ubicacion: "", vencimiento_carga: "", vencimiento_ph: "" });
+  const [f, setF] = useState({ cliente: clienteInicial || clientes[0]?.id || "", numero_serie: "", clase: "", ubicacion: "", marca: "", anio_fabricacion: "", agente: "", capacidad: "", vencimiento_carga: "", vencimiento_ph: "" });
   const [error, setError] = useState("");
 
   const enviar = async (e) => {
     e.preventDefault();
     const body = { ...f };
-    ["vencimiento_carga", "vencimiento_ph"].forEach((k) => !body[k] && delete body[k]);
+    ["vencimiento_carga", "vencimiento_ph", "anio_fabricacion"].forEach((k) => !body[k] && delete body[k]);
     try {
       await api("/matafuegos/", { method: "POST", body });
       onDone();
@@ -59,6 +59,13 @@ function FormMatafuego({ clientes, clienteInicial, onDone }) {
       <input className="input min-h-[44px]" placeholder="N° de serie" value={f.numero_serie} onChange={(e) => setF({ ...f, numero_serie: e.target.value })} required />
       <input className="input min-h-[44px]" placeholder="Clase (ABC, BC…)" value={f.clase} onChange={(e) => setF({ ...f, clase: e.target.value })} />
       <input className="input min-h-[44px] sm:col-span-3" placeholder="Ubicación" value={f.ubicacion} onChange={(e) => setF({ ...f, ubicacion: e.target.value })} />
+      <input className="input min-h-[44px]" placeholder="Marca" maxLength={60} value={f.marca} onChange={(e) => setF({ ...f, marca: e.target.value })} />
+      <input className="input min-h-[44px]" placeholder="Año de fabricación" type="number" inputMode="numeric" min={1950} max={new Date().getFullYear() + 1} value={f.anio_fabricacion} onChange={(e) => setF({ ...f, anio_fabricacion: e.target.value })} />
+      <input className="input min-h-[44px]" placeholder="Agente (POLVO, CO2…)" list="agentes-extintores" maxLength={30} value={f.agente} onChange={(e) => setF({ ...f, agente: e.target.value })} />
+      <input className="input min-h-[44px]" placeholder="Capacidad (ej. 5 KG)" maxLength={20} value={f.capacidad} onChange={(e) => setF({ ...f, capacidad: e.target.value })} />
+      <datalist id="agentes-extintores">
+        {["POLVO", "HCFC", "CO2", "ESPUMA", "AGUA"].map((a) => <option key={a} value={a} />)}
+      </datalist>
       <label className="text-xs">Venc. carga<input className="input min-h-[44px]" type="date" value={f.vencimiento_carga} onChange={(e) => setF({ ...f, vencimiento_carga: e.target.value })} /></label>
       <label className="text-xs">Venc. PH<input className="input min-h-[44px]" type="date" value={f.vencimiento_ph} onChange={(e) => setF({ ...f, vencimiento_ph: e.target.value })} /></label>
       <button className="btn min-h-[44px] self-end">Agregar matafuego</button>
