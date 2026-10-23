@@ -9,7 +9,7 @@ const ESTILOS = {
 export default function EstadoBadge({ estado }) {
   const e = ESTILOS[estado] || ESTILOS.GRIS;
   return (
-    <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold text-white ${e.bg}`}>
+    <span className={`inline-block rounded-full px-3 py-1 text-xs font-semibold text-white transition-colors duration-micro ${e.bg}`}>
       {e.label}
     </span>
   );

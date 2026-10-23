@@ -61,6 +61,9 @@ Cada matafuego tiene un `token_qr` (UUID inmutable). El QR apunta a `/qr/<token>
 - Con rol y cliente asignado: la misma ficha con **Nuevo control** (todos los roles) y **Editar ficha** (OFICINA/ADMIN).
 - Los controles son inmutables y actualizan ubicación/vencimientos del matafuego.
 
+## V3.3 · rediseño visual
+Fondo animado de partículas, tema claro/oscuro y transiciones con `motion`. Ver CHANGELOG. Hay que correr `npm install` en `frontend/`.
+
 ## V3.1
 
 Staff agrega y edita Clientes y Matafuegos desde `/admin/` (con auditoría), y la OFICINA asigna clientes a sus operarios. Detalle en [CHANGELOG.md](CHANGELOG.md). Hay que correr `DEBUG=1 python manage.py test` (incluye `tests_v31.py`); no hay migraciones nuevas.

@@ -4,6 +4,8 @@ import { api } from "./api.js";
 import EstadoVacio from "./EstadoVacio.jsx";
 import { ListaSkeleton } from "./Skeleton.jsx";
 import { vibrar } from "./haptico.js";
+import { motion } from "motion/react";
+import { Item, Panel } from "./animado.jsx";
 
 const CADA_MS = 60_000; // el contador es liviano; se consulta una vez por minuto
 
@@ -127,17 +129,18 @@ export default function Notificaciones() {
           <path d="M10 20a2 2 0 0 0 4 0" />
         </svg>
         {noLeidas > 0 && (
-          <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-acento px-1 text-xs font-bold text-white">
+          <motion.span key={noLeidas} initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-acento px-1 text-xs font-bold text-white">
             {noLeidas > 99 ? "99+" : noLeidas}
-          </span>
+          </motion.span>
         )}
       </button>
 
       {abierto && (
-        <section
+        <Panel
+          as="section"
           id="panel-avisos"
           aria-label="Avisos"
-          className="absolute right-0 z-40 mt-2 w-[min(92vw,24rem)] rounded-lg border border-slate-200 bg-white p-3 text-ink shadow-lg dark:border-slate-600 dark:bg-slate-800"
+          className="absolute right-0 z-40 mt-2 w-[min(92vw,24rem)] rounded-lg border border-cian-borde bg-white p-3 text-ink shadow-tarjeta dark:border-slate-600 dark:bg-slate-800 dark:shadow-tarjeta-noche"
         >
           <div className="mb-2 flex items-center gap-2">
             <h2 className="mr-auto text-lg font-bold text-ink">Avisos</h2>
@@ -173,8 +176,8 @@ export default function Notificaciones() {
             )}
             {lista && lista.length > 0 && (
               <ul className="space-y-2">
-                {lista.map((n) => (
-                  <li key={n.id}>
+                {lista.map((n, i) => (
+                  <Item as="li" i={i} key={n.id}>
                     <button
                       type="button"
                       onClick={() => abrirAviso(n)}
@@ -196,12 +199,12 @@ export default function Notificaciones() {
                         <span className="block text-xs text-slate-500">{fechaCorta(n.creada)}</span>
                       </span>
                     </button>
-                  </li>
+                  </Item>
                 ))}
               </ul>
             )}
           </div>
-        </section>
+        </Panel>
       )}
     </div>
   );

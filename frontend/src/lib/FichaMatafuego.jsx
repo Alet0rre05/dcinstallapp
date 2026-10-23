@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Item, Panel } from "./animado.jsx";
 import EstadoBadge from "./EstadoBadge.jsx";
 import RevisionBadge from "./RevisionBadge.jsx";
 import { FormControl } from "./FormControl.jsx";
@@ -17,7 +18,7 @@ export default function FichaMatafuego({ m, esStaff, esCampo, onBaja, onRestaura
   const [controlando, setControlando] = useState(false);
 
   return (
-    <section className="card space-y-3" aria-label={`Ficha del matafuego ${m.numero_serie}`}>
+    <Item as="section" className="card space-y-3" aria-label={`Ficha del matafuego ${m.numero_serie}`}>
       <div className="flex flex-wrap items-start gap-3">
         <div className="mr-auto min-w-0">
           <h2 className="text-2xl font-bold text-ink">
@@ -62,14 +63,14 @@ export default function FichaMatafuego({ m, esStaff, esCampo, onBaja, onRestaura
       </div>
 
       {verQR && (
-        <div className="flex flex-col items-center gap-1">
+        <Panel className="flex flex-col items-center gap-1">
           <QRMatafuego token={m.token_qr} />
           <a className="link break-all text-sm" href={urlQR(m.token_qr)} target="_blank" rel="noreferrer">{urlQR(m.token_qr)}</a>
-        </div>
+        </Panel>
       )}
       {controlando && (
-        <FormControl matafuego={m} onDone={() => { setControlando(false); onControlado?.(); }} />
+        <Panel><FormControl matafuego={m} onDone={() => { setControlando(false); onControlado?.(); }} /></Panel>
       )}
-    </section>
+    </Item>
   );
 }

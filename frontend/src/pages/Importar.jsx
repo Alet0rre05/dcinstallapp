@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { motion } from "motion/react";
+import { Item, Panel } from "../lib/animado.jsx";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
@@ -39,12 +41,27 @@ export default function Importar() {
     }
   };
 
-  const elegirArchivo = (e) => {
-    const f = e.target.files?.[0] || null;
+  const [arrastrando, setArrastrando] = useState(false);
+
+  const tomarArchivo = (f) => {
     setVista(null); setError(""); setErroresFinal(null);
     if (f && !/\.(xlsx|csv)$/i.test(f.name)) { setArchivo(null); setError("Solo se aceptan archivos .xlsx o .csv."); return; }
     if (f && f.size > MAX_MB * 1024 * 1024) { setArchivo(null); setError(`El archivo supera el máximo de ${MAX_MB} MB.`); return; }
     setArchivo(f);
+  };
+
+  const elegirArchivo = (e) => tomarArchivo(e.target.files?.[0] || null);
+
+  // Soltar un archivo: mismas validaciones que el selector; se sincroniza el input para que el estado coincida.
+  const soltar = (e) => {
+    e.preventDefault();
+    setArrastrando(false);
+    const f = e.dataTransfer?.files?.[0] || null;
+    if (!f) return;
+    if (inputArchivo.current) {
+      try { const dt = new DataTransfer(); dt.items.add(f); inputArchivo.current.files = dt.files; } catch { /* navegadores sin DataTransfer: igual se usa el archivo */ }
+    }
+    tomarArchivo(f);
   };
 
   const enviar = async (dryRun) => {
@@ -67,7 +84,7 @@ export default function Importar() {
   // -- Éxito --------------------------------------------------------------------
   if (hecho) {
     return (
-      <div className="card space-y-3">
+      <Item className="card space-y-3">
         <h1 className="text-xl font-bold">✅ Importación lista</h1>
         <p className="text-base">Se cargaron <b>{hecho.creados}</b> equipos para <b>{cliente?.nombre}</b>.</p>
         <div className="flex flex-wrap gap-2">
@@ -79,7 +96,7 @@ export default function Importar() {
           </button>
           <button className="btn-sec min-h-[44px]" onClick={reiniciar}>Importar otro archivo</button>
         </div>
-      </div>
+      </Item>
     );
   }
 
@@ -110,13 +127,26 @@ export default function Importar() {
 
       <section className="card space-y-2">
         <h2 className="text-base font-semibold">3. Subí el archivo</h2>
-        <input
-          ref={inputArchivo}
-          type="file"
-          accept=".xlsx,.csv"
-          className="input min-h-[44px]"
-          onChange={elegirArchivo}
-        />
+        <div
+          onDragEnter={(e) => { e.preventDefault(); setArrastrando(true); }}
+          onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setArrastrando(false); }}
+          onDrop={soltar}
+          className={`rounded-lg border-2 border-dashed p-3 transition-colors duration-micro ${
+            arrastrando ? "border-cian bg-cian/10 shadow-glow-cian" : "border-cian-borde"
+          }`}
+        >
+          <p className="mb-2 text-sm text-slate-600" aria-live="polite">
+            {arrastrando ? "Soltá el archivo acá" : archivo ? `Archivo elegido: ${archivo.name}` : "Arrastrá un .xlsx o .csv hasta acá, o elegilo:"}
+          </p>
+          <input
+            ref={inputArchivo}
+            type="file"
+            accept=".xlsx,.csv"
+            className="input min-h-[44px]"
+            onChange={elegirArchivo}
+          />
+        </div>
         <button
           className="btn min-h-[44px]"
           disabled={!clienteId || !archivo || enviando}
@@ -124,13 +154,26 @@ export default function Importar() {
         >
           {enviando && !vista ? "Revisando…" : "Revisar archivo"}
         </button>
+        {enviando && (
+          <div role="status" className="space-y-1">
+            <span className="block h-1.5 overflow-hidden rounded-full bg-cian/20">
+              {/* indeterminada a propósito: no se conoce el avance real del servidor */}
+              <motion.span
+                className="block h-full w-1/3 rounded-full bg-cian"
+                animate={{ x: ["-100%", "300%"] }}
+                transition={{ duration: 1.2, ease: "linear", repeat: Infinity }}
+              />
+            </span>
+            <span className="text-sm text-slate-600">{vista ? "Importando…" : "Revisando el archivo…"}</span>
+          </div>
+        )}
         {!clienteId && <p className="text-sm text-slate-500">Primero elegí un cliente.</p>}
       </section>
 
       {error && <p role="alert" className="rounded border border-red-300 bg-red-50 p-3 text-base text-red-700">{error}</p>}
 
       {detalle && (
-        <section className="card space-y-3" aria-label="Vista previa">
+        <Panel as="section" className="card space-y-3" aria-label="Vista previa">
           <h2 className="text-base font-semibold">4. Vista previa — {detalle.archivo}</h2>
           <p className="text-base">
             {detalle.total_filas} filas · <b className="text-green-700">{detalle.validas} válidas</b> ·{" "}
@@ -179,7 +222,7 @@ export default function Importar() {
               <button className="btn-sec min-h-[44px]" disabled={enviando} onClick={reiniciar}>Cancelar</button>
             </div>
           )}
-        </section>
+        </Panel>
       )}
     </div>
   );

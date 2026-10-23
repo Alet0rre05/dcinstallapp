@@ -1,17 +1,19 @@
 # Changelog
 
-## Mejora visual global (sin cambios de API ni de base de datos)
+## 3.3.0 (rediseño visual · solo frontend)
 
 ### Agregado
-- Fondo ambiental global con Canvas 2D: partículas orbitales, trazos curvos y resplandor cian/índigo en todas las rutas del frontend.
-- Transición breve al navegar entre rutas e interacciones consistentes para tarjetas, botones, navegación, campos y filas de tablas.
-- Adaptación automática al modo claro/oscuro, al tamaño de pantalla y a la preferencia del sistema de movimiento reducido.
-- Pausa del ciclo de animación cuando la pestaña queda oculta y ocultación de los efectos en impresión.
+- **Fondo de partículas en órbita** (`ParticleOrbitBackground.jsx`): Canvas 2D con `requestAnimationFrame`, sin renders de React por cuadro. 250–450 partículas en escritorio, 60–150 en móvil, calidad adaptativa, pausa con la pestaña oculta, cuadro estático con `prefers-reduced-motion`, oculto al imprimir.
+- **Motor de animación** con `motion` (`lib/motionConfig.js`, `lib/animado.jsx`): micro 120–220 ms, paneles/rutas 180–300 ms. Las rutas solo animan la *entrada*, nunca retrasan el cambio de pantalla; el escalonado tiene tope.
+- Tema claro/oscuro centralizado en `lib/tema.jsx` (sigue al sistema si no se eligió) y paleta nueva en `tailwind.config.js` (cian, índigo eléctrico, noche).
+- Dashboard con indicadores y barras animadas; zona de arrastrar y soltar en Importar con estados reales (sin barra de progreso falsa: la carga es indeterminada).
+- Paneles con entrada animada en Notificaciones, Combobox, Ficha del matafuego, Tickets y ScanQR; microinteracción táctil en botones.
 
-### Compatibilidad
-- No incorpora dependencias de npm, migraciones, endpoints ni cambios en los flujos de negocio.
-- El lienzo decorativo no captura clics y se mantiene detrás de la interfaz, incluida la lectura y operación de controles.
+### Sin cambios
+- Backend, API, JWT, rutas protegidas, Turnstile, PDF, importación de Excel y `haptico.js`. Los colores de estado (verde/rojo/ámbar) siguen siendo semánticos. La impresión sigue siempre en claro.
 
+### Para actualizar
+- Ejecutar `npm install` (se agregó `motion`; el `package-lock.json` no se regeneró).
 
 ## 3.2.0 (parche)
 

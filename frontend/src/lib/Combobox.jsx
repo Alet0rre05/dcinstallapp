@@ -1,3 +1,4 @@
+import { Panel } from "./animado.jsx";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const normalizar = (t) =>
@@ -76,12 +77,13 @@ export default function Combobox({
         onKeyDown={onKeyDown}
       />
       {abierto && (
-        <ul
+        <Panel
+          as="ul"
           id={`${id}-lista`}
           role="listbox"
           aria-label={label}
           onMouseDown={(e) => e.preventDefault() /* no perder el foco antes del click */}
-          className="absolute z-20 mt-1 max-h-[55vh] w-full overflow-auto rounded-lg border border-slate-300 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-[55vh] w-full overflow-auto rounded-lg border border-cian-borde bg-white shadow-tarjeta dark:shadow-tarjeta-noche"
         >
           {filtrados.length === 0 && <li className="p-3 text-base text-slate-500">{vacio}</li>}
           {filtrados.map((it, i) => {
@@ -100,7 +102,7 @@ export default function Combobox({
               </li>
             );
           })}
-        </ul>
+        </Panel>
       )}
     </div>
   );

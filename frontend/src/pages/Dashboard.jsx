@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { motion } from "motion/react";
 import { api } from "../lib/api.js";
+import { Item } from "../lib/animado.jsx";
+import { DUR, EASE } from "../lib/motionConfig.js";
 import { useAuth } from "../lib/auth.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
 import EstadoVacio from "../lib/EstadoVacio.jsx";
@@ -22,9 +25,9 @@ const ICONOS = {
   sin_revisar: <><circle cx="12" cy="12" r="9" strokeDasharray="3 3" /></>,
 };
 
-function Indicador({ icono, valor, titulo, clases }) {
+function Indicador({ i, icono, valor, titulo, clases }) {
   return (
-    <li className={`flex min-h-[88px] items-center gap-3 rounded-lg border p-4 ${clases}`}>
+    <Item as="li" i={i} className={`flex min-h-[88px] items-center gap-3 rounded-lg border p-4 shadow-tarjeta transition-shadow duration-micro hover:shadow-glow-cian dark:shadow-tarjeta-noche ${clases}`}>
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         {ICONOS[icono]}
       </svg>
@@ -32,7 +35,7 @@ function Indicador({ icono, valor, titulo, clases }) {
         <span className="block text-3xl font-bold leading-none">{valor}</span>
         <span className="block pt-1 text-base font-semibold">{titulo}</span>
       </span>
-    </li>
+    </Item>
   );
 }
 
@@ -62,9 +65,12 @@ function GraficoMeses({ datos }) {
                   {[["carga", d.carga], ["ph", d.ph]].map(([tipo, n]) => (
                     <div key={tipo} className="flex h-full w-1/2 max-w-[2.5rem] flex-col items-center justify-end">
                       <span className="pb-1 text-sm font-bold text-ink">{n}</span>
-                      <div
-                        style={{ height: `${(n / max) * 100}%`, minHeight: n > 0 ? 4 : 0 }}
-                        className={`w-full rounded-t-md border-2 border-acento transition-all duration-200 dark:border-acento-soft ${
+                      <motion.div
+                        initial={{ scaleY: 0 }}
+                        animate={{ scaleY: 1 }}
+                        transition={{ duration: DUR.panel, ease: EASE, delay: 0.08 }}
+                        style={{ height: `${(n / max) * 100}%`, minHeight: n > 0 ? 4 : 0, transformOrigin: "bottom" }}
+                        className={`w-full rounded-t-md border-2 border-acento dark:border-acento-soft ${
                           tipo === "carga"
                             ? "bg-acento dark:bg-acento-soft"
                             : "bg-[image:repeating-linear-gradient(45deg,#3B4BB0_0,#3B4BB0_2px,transparent_2px,transparent_5px)] dark:bg-[image:repeating-linear-gradient(45deg,#A5B4FC_0,#A5B4FC_2px,transparent_2px,transparent_5px)]"
@@ -98,7 +104,7 @@ function ReparticionEstados({ por_estado, total }) {
           <li key={e} className="flex items-center gap-3">
             <span className="w-40 shrink-0"><EstadoBadge estado={e} /></span>
             <span className="h-3 flex-1 overflow-hidden rounded-full bg-slate-200">
-              <span className="block h-full rounded-full bg-acento dark:bg-acento-soft" style={{ width: total ? `${(n / total) * 100}%` : 0 }} />
+              <motion.span className="block h-full rounded-full bg-acento dark:bg-acento-soft" initial={{ width: 0 }} animate={{ width: total ? `${(n / total) * 100}%` : 0 }} transition={{ duration: DUR.ruta, ease: EASE, delay: 0.1 }} />
             </span>
             <span className="w-10 text-right text-base font-bold text-ink">{n}</span>
           </li>
@@ -166,10 +172,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg bg-acento p-4 text-white shadow-sm dark:bg-acento-deep dark:text-acento-soft">
+      <Item i={0} className="rounded-lg bg-gradient-to-r from-cian-oscuro to-electrico p-4 text-white shadow-tarjeta dark:border dark:border-noche-borde dark:from-noche-card dark:to-electrico-deep dark:text-noche-texto dark:shadow-glow-cian">
         <h1 className="text-2xl font-bold">Dashboard de vencimientos</h1>
         <p className="text-base">Qué vence, cuándo y qué equipos necesitan atención. Solo equipos activos de tus clientes.</p>
-      </div>
+      </Item>
 
       <div className="card grid gap-3 sm:grid-cols-2">
         {user.clientes.length > 1 || user.rol === "ADMIN" ? (
@@ -214,10 +220,10 @@ export default function Dashboard() {
       {data && t.equipos > 0 && (
         <>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Resumen">
-            <Indicador icono="equipos" valor={t.equipos} titulo="Equipos activos" clases="border-acento/40 bg-acento-light text-acento-dark dark:border-acento-soft/40 dark:bg-acento-deep dark:text-acento-soft" />
-            <Indicador icono="vencidos" valor={t.vencidos} titulo={t.vencidos === 1 ? "Equipo vencido" : "Equipos vencidos"} clases="border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900/40 dark:text-red-300" />
-            <Indicador icono="por_vencer" valor={t.por_vencer} titulo="Por vencer (30 días)" clases="border-yellow-300 bg-yellow-100 text-yellow-900 dark:border-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200" />
-            <Indicador icono="sin_revisar" valor={t.sin_revisar} titulo="Sin revisar este mes" clases="border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+            <Indicador i={0} icono="equipos" valor={t.equipos} titulo="Equipos activos" clases="border-acento/40 bg-acento-light text-acento-dark dark:border-acento-soft/40 dark:bg-acento-deep dark:text-acento-soft" />
+            <Indicador i={1} icono="vencidos" valor={t.vencidos} titulo={t.vencidos === 1 ? "Equipo vencido" : "Equipos vencidos"} clases="border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900/40 dark:text-red-300" />
+            <Indicador i={2} icono="por_vencer" valor={t.por_vencer} titulo="Por vencer (30 días)" clases="border-yellow-300 bg-yellow-100 text-yellow-900 dark:border-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-200" />
+            <Indicador i={3} icono="sin_revisar" valor={t.sin_revisar} titulo="Sin revisar este mes" clases="border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
           </ul>
 
           {(data.vencidos_por_tipo.carga > 0 || data.vencidos_por_tipo.ph > 0) && (
@@ -226,18 +232,18 @@ export default function Dashboard() {
             </p>
           )}
 
-          <section className="card" aria-labelledby="h-meses">
+          <Item as="section" i={4} className="card" aria-labelledby="h-meses">
             <h2 id="h-meses" className="mb-1 text-xl font-bold text-ink">Vencimientos por mes</h2>
             <p className="mb-2 text-base text-slate-600">Cantidad de cargas y pruebas hidráulicas que vencen en cada mes.</p>
             <GraficoMeses datos={data.por_mes} />
-          </section>
+          </Item>
 
-          <section className="card" aria-labelledby="h-estados">
+          <Item as="section" i={5} className="card" aria-labelledby="h-estados">
             <h2 id="h-estados" className="mb-3 text-xl font-bold text-ink">Estado de los equipos</h2>
             <ReparticionEstados por_estado={t.por_estado} total={t.equipos} />
-          </section>
+          </Item>
 
-          <section className="card" aria-labelledby="h-prox">
+          <Item as="section" i={6} className="card" aria-labelledby="h-prox">
             <h2 id="h-prox" className="mb-1 text-xl font-bold text-ink">Próximos vencimientos</h2>
             <p className="mb-3 text-base text-slate-600">Vencidos y los que vencen en los próximos {data.dias_proximos} días, del más urgente al menos.</p>
             {data.proximos.length === 0 ? (
@@ -278,7 +284,7 @@ export default function Dashboard() {
                 )}
               </>
             )}
-          </section>
+          </Item>
         </>
       )}
     </div>

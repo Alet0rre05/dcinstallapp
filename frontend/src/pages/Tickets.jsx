@@ -1,3 +1,4 @@
+import { Item, Panel } from "../lib/animado.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { useAuth } from "../lib/auth.jsx";
@@ -149,15 +150,15 @@ export default function Tickets() {
       {!data ? <ListaSkeleton filas={3} alto="h-14" /> : (
         <>
           <ul className="space-y-3">
-            {data.results.map((t) => (
-              <li key={t.id} className="card">
+            {data.results.map((t, i) => (
+              <Item as="li" i={i} key={t.id} className="card">
                 <button className="flex w-full items-center gap-3 text-left" onClick={() => setAbierto(abierto === t.id ? null : t.id)}>
                   <span className="mr-auto font-semibold">#{t.id} {t.titulo}</span>
                   <span className="text-xs text-slate-500">{t.cliente_nombre}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs text-white ${t.estado === "ABIERTO" ? "bg-green-600" : "bg-slate-500"}`}>{t.estado}</span>
                 </button>
-                {abierto === t.id && <Chat ticket={t} onChange={cargar} />}
-              </li>
+                {abierto === t.id && <Panel><Chat ticket={t} onChange={cargar} /></Panel>}
+              </Item>
             ))}
             {data.results.length === 0 && <EstadoVacio titulo="No hay tickets">Cuando abras un pedido de soporte lo vas a ver acá.</EstadoVacio>}
           </ul>
