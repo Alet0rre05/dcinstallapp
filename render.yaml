@@ -19,6 +19,8 @@ services:
         sync: false
       - key: TURNSTILE_SECRET_KEY
         sync: false
+      - key: EMPRESA_RELEVADORA
+        value: DCINSTALL SRL   # va en «Relevado por:» de la planilla de extintores (V3.0)
       - key: CORS_ALLOWED_ORIGINS
         sync: false   # ej: https://dcinstall-web.onrender.com
       - key: CSRF_TRUSTED_ORIGINS
