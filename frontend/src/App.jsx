@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./lib/auth.jsx";
 import Logo from "./lib/Logo.jsx";
 import { ListaSkeleton } from "./lib/Skeleton.jsx";
@@ -13,10 +13,12 @@ import Panel from "./pages/Panel.jsx";
 import SinAcceso from "./pages/SinAcceso.jsx";
 import Importar from "./pages/Importar.jsx";
 import Etiquetas from "./pages/Etiquetas.jsx";
+import Planillas from "./pages/Planillas.jsx";
 import Tutoria from "./pages/Tutoria.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Notificaciones from "./lib/Notificaciones.jsx";
 import BotonTema from "./lib/tema.jsx";
+import AmbientMotion from "./lib/AmbientMotion.jsx";
 
 /** Requiere sesión Y rol. Con sesión pero sin rol (público registrado) -> pantalla "sin acceso". */
 function Privada({ children }) {
@@ -38,6 +40,7 @@ const claseLink = ({ isActive }) =>
 
 function Layout({ children }) {
   const { user, tieneRol, esStaff, logout } = useAuth();
+  const location = useLocation();
   const [abierto, setAbierto] = useState(false);
   const cerrar = () => setAbierto(false);
 
@@ -48,7 +51,9 @@ function Layout({ children }) {
   );
 
   return (
-    <>
+    <div className="dci-visual-shell">
+      <AmbientMotion />
+      <div className="dci-app-content">
       <header className="sticky top-0 z-30 bg-brand text-ink shadow print:hidden">
         <nav aria-label="Principal" className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-2 px-3 py-2">
           <Link to="/" onClick={cerrar} className="mr-auto flex min-h-[44px] items-center rounded">
@@ -78,6 +83,7 @@ function Layout({ children }) {
                     {enlace("/dashboard", "Dashboard")}
                     {esStaff && enlace("/importar", "Importar")}
                     {esStaff && enlace("/etiquetas", "Etiquetas")}
+                    {esStaff && enlace("/planillas", "Planillas")}
                     {enlace("/tickets", "Soporte")}
                     {enlace("/panel", "Panel de Control")}
                     {enlace("/perfil", user.first_name || user.username)}
@@ -98,8 +104,11 @@ function Layout({ children }) {
           </ul>
         </nav>
       </header>
-      <main className="mx-auto max-w-5xl p-4">{children}</main>
-    </>
+      <main className="mx-auto max-w-5xl p-4">
+        <div key={location.pathname} className="dci-route-transition">{children}</div>
+      </main>
+      </div>
+    </div>
   );
 }
 
@@ -114,6 +123,7 @@ export default function App() {
         <Route path="/" element={<Privada><Matafuegos /></Privada>} />
         <Route path="/importar" element={<Privada><SoloStaff><Importar /></SoloStaff></Privada>} />
         <Route path="/etiquetas" element={<Privada><SoloStaff><Etiquetas /></SoloStaff></Privada>} />
+        <Route path="/planillas" element={<Privada><SoloStaff><Planillas /></SoloStaff></Privada>} />
         <Route path="/dashboard" element={<Privada><Dashboard /></Privada>} />
         <Route path="/tickets" element={<Privada><Tickets /></Privada>} />
         <Route path="/panel" element={<Privada><Panel /></Privada>} />
