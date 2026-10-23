@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api.js";
+import { Item, Panel } from "../lib/animado.jsx";
 import { useAuth } from "../lib/auth.jsx";
 import EstadoBadge from "../lib/EstadoBadge.jsx";
 import RevisionBadge from "../lib/RevisionBadge.jsx";
@@ -100,7 +101,7 @@ export default function ScanQR() {
   const hecho = () => { setModo(null); cargar(); };
 
   return (
-    <div className="card mx-auto mt-6 max-w-md space-y-2">
+    <Item className="card mx-auto mt-6 max-w-md space-y-2">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Matafuego {m.numero_serie}</h1>
         <EstadoBadge estado={m.estado_color} />
@@ -123,8 +124,8 @@ export default function ScanQR() {
           {esStaff && <button className="btn-sec" onClick={() => setModo(modo === "editar" ? null : "editar")}>Editar ficha</button>}
         </div>
       )}
-      {priv && modo === "control" && <FormControl matafuego={priv} onDone={hecho} />}
-      {priv && modo === "editar" && esStaff && <FormEditar m={priv} onDone={hecho} />}
+      {priv && modo === "control" && <Panel><FormControl matafuego={priv} onDone={hecho} /></Panel>}
+      {priv && modo === "editar" && esStaff && <Panel><FormEditar m={priv} onDone={hecho} /></Panel>}
 
       {sinAsignar && (
         <p role="status" className="rounded border border-amber-400 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
@@ -146,6 +147,6 @@ export default function ScanQR() {
       {user && !tieneRol && (
         <p className="pt-2 text-xs text-slate-500">Tu cuenta no tiene rol asignado, por eso ves solo la información pública.</p>
       )}
-    </div>
+    </Item>
   );
 }

@@ -1,3 +1,4 @@
+import { Item } from "../lib/animado.jsx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../lib/api.js";
@@ -74,12 +75,12 @@ function FormMatafuego({ clientes, clienteInicial, onDone }) {
   );
 }
 
-function TarjetaCliente({ c, onAbrir }) {
+function TarjetaCliente({ c, i, onAbrir }) {
   return (
-    <li>
+    <Item as="li" i={i}>
       <button
         onClick={() => onAbrir(c.id)}
-        className="card flex min-h-[72px] w-full items-center gap-3 text-left hover:border-brand-dark hover:bg-brand-light active:bg-brand/30"
+        className="card flex min-h-[72px] w-full items-center gap-3 text-left hover:border-brand-dark hover:bg-brand-light hover:shadow-glow-cian active:bg-brand/30 transition-[box-shadow,background-color,border-color] duration-micro"
       >
         <span className="mr-auto">
           <span className="block text-lg font-semibold text-ink">{c.nombre}</span>
@@ -108,7 +109,7 @@ function TarjetaCliente({ c, onAbrir }) {
         </span>
         <span aria-hidden="true" className="text-2xl text-slate-400">›</span>
       </button>
-    </li>
+    </Item>
   );
 }
 
@@ -208,7 +209,7 @@ export default function Matafuegos() {
           </EstadoVacio>
         )}
         <ul className="space-y-3">
-          {resumen.map((c) => <TarjetaCliente key={c.id} c={c} onAbrir={abrirCliente} />)}
+          {resumen.map((c, i) => <TarjetaCliente key={c.id} c={c} i={i} onAbrir={abrirCliente} />)}
         </ul>
       </div>
     );
