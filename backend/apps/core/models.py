@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -17,12 +18,25 @@ LIMITE_MENSAJES_SOPORTE = 10
 MAX_CARACTERES_MENSAJE = 3000
 
 
+ANIO_FABRICACION_MIN = 1950
+
+
+def validar_anio_fabricacion(valor):
+    """Año de fabricación entre 1950 y el año que viene (equipos recién comprados)."""
+    maximo = timezone.localdate().year + 1
+    if valor is not None and not ANIO_FABRICACION_MIN <= valor <= maximo:
+        raise ValidationError(f"El año de fabricación tiene que estar entre {ANIO_FABRICACION_MIN} y {maximo}.")
+
+
 # ---------------------------------------------------------------------------
 # Cliente y Perfil
 # ---------------------------------------------------------------------------
 class Cliente(models.Model):
     nombre = models.CharField(max_length=150, unique=True)
     contacto = models.CharField(max_length=255, blank=True)
+    # Planta/sede que va en el encabezado de la planilla de extintores (V3.0).
+    # Si está vacía se usa el nombre del cliente.
+    planta = models.CharField(max_length=200, blank=True)
     creado = models.DateTimeField(auto_now_add=True)
     history = HistoricalRecords()
 
@@ -72,6 +86,13 @@ class Matafuego(models.Model):
     numero_serie = models.CharField(max_length=60)
     clase = models.CharField(max_length=30, blank=True)
     ubicacion = models.CharField(max_length=200, blank=True)
+    # Datos de la planilla de extintores (V3.0)
+    marca = models.CharField(max_length=60, blank=True)
+    anio_fabricacion = models.PositiveSmallIntegerField(
+        null=True, blank=True, validators=[validar_anio_fabricacion]
+    )
+    agente = models.CharField(max_length=30, blank=True)  # POLVO, HCFC, CO2, ESPUMA, AGUA…
+    capacidad = models.CharField(max_length=20, blank=True)  # ej. "5 KG"
     vencimiento_carga = models.DateField(null=True, blank=True)
     vencimiento_ph = models.DateField(null=True, blank=True)
     token_qr = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -91,6 +112,8 @@ class Matafuego(models.Model):
         return f"{self.numero_serie} - {self.cliente}"
 
     def save(self, *args, **kwargs):
+        # El agente extintor se guarda siempre en mayúsculas y sin espacios de más
+        self.agente = " ".join((self.agente or "").split()).upper()
         # token_qr es inmutable: si ya existe en DB, se restaura el original
         if not self._state.adding:
             original = (
@@ -185,11 +208,19 @@ class Control(models.Model):
     senalizacion = models.BooleanField(default=True)
     chapa_baliza = models.BooleanField(default=True)  # True = en buen estado
     accesible = models.BooleanField(default=True)
+    # Precinto de seguridad (V3.0). None = sin dato (controles anteriores a la V3.0)
+    precinto = models.BooleanField(null=True, blank=True, default=None)
     observaciones = models.TextField(blank=True)
     # Datos opcionales que, si se informan, actualizan al matafuego padre
     ubicacion = models.CharField(max_length=200, blank=True)
     vencimiento_carga = models.DateField(null=True, blank=True)
     vencimiento_ph = models.DateField(null=True, blank=True)
+    # Evidencias y clave para sincronizar controles offline sin duplicarlos.
+    foto_data = models.TextField(blank=True)
+    firma_data = models.TextField(blank=True)
+    gps_latitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    gps_longitud = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    idempotency_key = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-fecha", "-id"]
@@ -218,6 +249,47 @@ class Control(models.Model):
 
     def delete(self, *args, **kwargs):
         raise PermissionError("Los controles son inmutables y no pueden eliminarse.")
+
+    def datos_para_auditoria(self):
+        """Foto completa del control (para el `antes` de la auditoría de borrado)."""
+        m = self.matafuego
+        return {
+            "matafuego_id": m.pk,
+            "matafuego": m.numero_serie,
+            "fecha": str(self.fecha),
+            "cargado_por": self.usuario.get_username() if self.usuario_id else "",
+            "presion": self.presion,
+            "precinto": self.precinto,
+            "senalizacion": self.senalizacion,
+            "chapa_baliza": self.chapa_baliza,
+            "accesible": self.accesible,
+            "observaciones": self.observaciones,
+            "ubicacion": self.ubicacion,
+            "vencimiento_carga": str(self.vencimiento_carga) if self.vencimiento_carga else None,
+            "vencimiento_ph": str(self.vencimiento_ph) if self.vencimiento_ph else None,
+            "foto_adjunto": bool(self.foto_data), "firma_capturada": bool(self.firma_data),
+            "gps_latitud": str(self.gps_latitud) if self.gps_latitud is not None else None,
+            "gps_longitud": str(self.gps_longitud) if self.gps_longitud is not None else None,
+        }
+
+    def eliminar_definitivo(self, usuario, request=None):
+        """Única vía para borrar un control (la usa el admin para staff/superusuarios).
+
+        `delete()` sigue bloqueado para que nadie lo borre por accidente desde código.
+        Acá se audita Y se borra en una sola transacción: si falla la auditoría no se borra.
+        No revierte la ubicación/vencimientos que el control haya copiado al matafuego;
+        `ultimo_control`, `revisado_mes` y el semáforo son calculados y se actualizan solos."""
+        from .audit import auditar  # evita import circular
+
+        with transaction.atomic():
+            m = self.matafuego
+            pk = self.pk
+            auditar(
+                request, "ELIMINACION", "Control", pk, f"Control {m.numero_serie}",
+                cliente_id=m.cliente_id, antes=self.datos_para_auditoria(), usuario=usuario,
+            )
+            models.Model.delete(self)
+        return pk
 
 
 # ---------------------------------------------------------------------------
@@ -339,6 +411,7 @@ class Notificacion(models.Model):
         TICKET_CERRADO = "TICKET_CERRADO", "Ticket cerrado"
         TICKET_REABIERTO = "TICKET_REABIERTO", "Ticket reabierto"
         VENCIMIENTOS = "VENCIMIENTOS", "Vencimientos"
+        ESCALADA = "ESCALADA", "Escalada de control"
 
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notificaciones"
@@ -363,3 +436,6 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"{self.usuario} · {self.titulo}"
+
+
+

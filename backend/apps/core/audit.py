@@ -31,6 +31,7 @@ def snapshot(obj, campos):
 MATAFUEGO_CAMPOS = [
     "cliente_id", "numero_serie", "clase", "ubicacion",
     "vencimiento_carga", "vencimiento_ph", "activo",
+    "marca", "anio_fabricacion", "agente", "capacidad",
 ]
 
 

@@ -20,7 +20,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from simple_history.utils import bulk_create_with_history
 
-from . import importacion, notificaciones, remito
+from . import importacion, notificaciones, planilla, remito
 from .audit import MATAFUEGO_CAMPOS, auditar, snapshot
 from .models import (
     Auditoria,
@@ -45,6 +45,7 @@ from .permissions import (
     rol_de,
 )
 from .serializers import (
+    EquipoOperarioSerializer,
     ActualizarPerfilSerializer,
     AsignarClientesSerializer,
     AsignarRolSerializer,
@@ -193,16 +194,44 @@ class ClienteViewSet(viewsets.ModelViewSet):
             })
         return Response(data)
 
+    # -- Planilla de extintores por cliente (V3.0) ---------------------------------
+    @action(detail=True, methods=["get"], url_path="exportar-planilla", permission_classes=[SoloStaff])
+    def exportar_planilla(self, request, pk=None):
+        """.xlsx con el formato de la planilla de referencia, solo con los equipos activos de este
+        cliente. `get_object()` aplica el scoping: un cliente ajeno da 404."""
+        cliente = self.get_object()
+        try:
+            mes, anio = planilla.periodo(request.query_params.get("mes"), request.query_params.get("anio"))
+            contenido, cantidad = planilla.generar(cliente, mes, anio)
+        except planilla.ErrorPlanilla as exc:
+            raise ValidationError({"detail": str(exc)})
+        auditar(request, "EXPORTACION", "Cliente", cliente.pk, cliente.nombre, cliente_id=cliente.pk,
+                despues={"mes": mes, "anio": anio, "equipos": cantidad})
+        resp = HttpResponse(
+            contenido,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        resp["Content-Disposition"] = f'attachment; filename="{planilla.nombre_archivo(cliente, mes, anio)}"'
+        # El front lee el nombre desde este header (CORS no lo expone por defecto)
+        resp["Access-Control-Expose-Headers"] = "Content-Disposition"
+        return resp
+
+    @action(detail=True, methods=["get"], url_path="exportar-planilla/resumen", permission_classes=[SoloStaff])
+    def exportar_planilla_resumen(self, request, pk=None):
+        """Vista previa para el front: equipos activos, con datos incompletos y sin ningún control."""
+        return Response(planilla.resumen(self.get_object()))
+
     def perform_create(self, serializer):
         c = serializer.save()
         auditar(self.request, "CREACION", "Cliente", c.pk, c.nombre, cliente_id=c.pk,
-                despues={"nombre": c.nombre, "contacto": c.contacto})
+                despues={"nombre": c.nombre, "contacto": c.contacto, "planta": c.planta})
 
     def perform_update(self, serializer):
-        antes = {"nombre": serializer.instance.nombre, "contacto": serializer.instance.contacto}
+        i = serializer.instance
+        antes = {"nombre": i.nombre, "contacto": i.contacto, "planta": i.planta}
         c = serializer.save()
         auditar(self.request, "MODIFICACION", "Cliente", c.pk, c.nombre, cliente_id=c.pk,
-                antes=antes, despues={"nombre": c.nombre, "contacto": c.contacto})
+                antes=antes, despues={"nombre": c.nombre, "contacto": c.contacto, "planta": c.planta})
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +313,7 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
     # -- Carga masiva desde Excel/CSV (solo ADMIN y OFICINA) -----------------------
     @action(detail=False, methods=["get"], url_path="plantilla-importacion", permission_classes=[SoloStaff])
     def plantilla_importacion(self, request):
-        """Plantilla .xlsx: hoja «Equipos» con encabezados y un ejemplo + hoja «Instrucciones»."""
+        """Plantilla .xlsx: la planilla de extintores en blanco (mismo formato que «Planillas»), una sola pestaña."""
         resp = HttpResponse(
             importacion.generar_plantilla(),
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -392,16 +421,31 @@ class ControlViewSet(
 
     def perform_create(self, serializer):
         c = serializer.save()
+        if not getattr(serializer, "control_creado", True):
+            return
         m = c.matafuego
         auditar(self.request, "CREACION", "Control", c.pk, f"Control {m.numero_serie}",
                 cliente_id=m.cliente_id,
                 despues={
                     "matafuego": m.numero_serie, "presion": c.presion,
-                    "senalizacion": c.senalizacion, "chapa_baliza": c.chapa_baliza,
-                    "accesible": c.accesible,
+                    "precinto": c.precinto, "senalizacion": c.senalizacion,
+                    "chapa_baliza": c.chapa_baliza, "accesible": c.accesible,
+                    "foto_adjunto": bool(c.foto_data), "firma_capturada": bool(c.firma_data),
+                    "gps_latitud": str(c.gps_latitud) if c.gps_latitud is not None else None,
+                    "gps_longitud": str(c.gps_longitud) if c.gps_longitud is not None else None,
                 })
 
 
+    @action(detail=True, methods=["get"])
+    def evidencia(self, request, pk=None):
+        """Recupera foto y firma solo para usuarios autorizados al cliente del equipo."""
+        control = self.get_object()
+        return Response({
+            "foto_data": control.foto_data,
+            "firma_data": control.firma_data,
+            "gps_latitud": str(control.gps_latitud) if control.gps_latitud is not None else None,
+            "gps_longitud": str(control.gps_longitud) if control.gps_longitud is not None else None,
+        })
 class QRPublicoView(APIView):
     """Escaneo público de QR: solo datos reducidos, sin autenticación."""
 
@@ -647,6 +691,79 @@ class AsignarClientesView(APIView):
 
 
 # ---------------------------------------------------------------------------
+# Operarios: la OFICINA asigna SUS clientes a los OPERARIOS (V3.1)
+# ---------------------------------------------------------------------------
+def _operarios_base():
+    return (
+        User.objects.filter(perfil__rol=Rol.OPERARIO, is_superuser=False)
+        .select_related("perfil")
+        .prefetch_related("perfil__clientes")
+    )
+
+
+class OperariosListView(generics.ListAPIView):
+    """OFICINA/ADMIN: todos los operarios (sin superusuarios). Cada uno con los clientes
+    que están dentro del alcance de quien consulta (la cartera de otras oficinas no se ve)."""
+
+    serializer_class = EquipoOperarioSerializer
+    permission_classes = [SoloStaff]
+    pagination_class = ListaGrandePagination
+
+    def get_queryset(self):
+        qs = _operarios_base()
+        q = self.request.query_params.get("q")
+        if q:
+            qs = qs.filter(
+                Q(email__icontains=q) | Q(username__icontains=q) | Q(first_name__icontains=q)
+            )
+        return qs.order_by("username")
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["alcance"] = clientes_ids(self.request.user)  # None = ADMIN (todos)
+        return ctx
+
+
+class OperarioAsignarClientesView(APIView):
+    """POST {user_id, clientes: [ids]} con estas reglas (V3.1):
+      - solo sobre usuarios con rol OPERARIO (si no: 403);
+      - la OFICINA solo asigna clientes de su alcance (si no: 400); el ADMIN, cualquiera;
+      - la OFICINA NUNCA quita clientes fuera de su alcance: el resultado es
+        (clientes actuales fuera del alcance) ∪ (seleccionados dentro del alcance)."""
+
+    permission_classes = [SoloStaff]
+
+    @transaction.atomic
+    def post(self, request):
+        s = AsignarClientesSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        user = get_object_or_404(User, pk=s.validated_data["user_id"])
+        if user.is_superuser or rol_de(user) != Rol.OPERARIO:
+            raise PermissionDenied("Solo podés gestionar operarios.")
+
+        pedidos = set(s.validated_data["clientes"])
+        alcance = clientes_ids(request.user)  # None = ADMIN
+        if alcance is not None:
+            fuera = pedidos - set(alcance)
+            if fuera:
+                raise ValidationError({"clientes": "Solo podés asignar clientes que vos tenés asignados."})
+        existentes = set(Cliente.objects.filter(id__in=pedidos).values_list("id", flat=True))
+        if existentes != pedidos:
+            raise ValidationError({"clientes": "Alguno de los clientes no existe."})
+
+        antes = _estado_usuario(user)
+        actuales = set(user.perfil.clientes.values_list("id", flat=True))
+        if alcance is None:
+            final = pedidos  # ADMIN: asignación exacta
+        else:
+            final = (actuales - set(alcance)) | pedidos  # conserva lo que está fuera de la cartera
+        user.perfil.clientes.set(Cliente.objects.filter(id__in=final))
+        auditar(request, "ASIGNACION_CLIENTES", "Usuario", user.pk, user.username,
+                antes=antes, despues=_estado_usuario(user))
+        return Response(EquipoOperarioSerializer(user, context={"alcance": alcance}).data)
+
+
+# ---------------------------------------------------------------------------
 # Auditoría (lectura)
 # ---------------------------------------------------------------------------
 class AuditoriaPagination(PageNumberPagination):
@@ -684,3 +801,5 @@ class AuditoriaListView(generics.ListAPIView):
                     raise ValidationError({clave: "Formato de fecha inválido (AAAA-MM-DD)."})
                 qs = qs.filter(**{lookup: timezone.make_aware(datetime.combine(d, hora), tz)})
         return qs
+
+

@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from . import dashboard, notificaciones, views
+from . import dashboard, mobile, notificaciones, reportes, views
 
 router = DefaultRouter()
 router.register("clientes", views.ClienteViewSet, basename="cliente")
@@ -19,10 +19,19 @@ urlpatterns = [
     path("equipo/asignar-rol/", views.AsignarRolView.as_view(), name="equipo-asignar"),
     path("equipo/revocar-rol/", views.RevocarRolView.as_view(), name="equipo-revocar"),
     path("equipo/asignar-clientes/", views.AsignarClientesView.as_view(), name="equipo-clientes"),
+    path("equipo/operarios/", views.OperariosListView.as_view(), name="equipo-operarios"),
+    path("equipo/operarios/asignar-clientes/", views.OperarioAsignarClientesView.as_view(), name="equipo-operarios-clientes"),
     path("auditoria/", views.AuditoriaListView.as_view(), name="auditoria"),
     path("dashboard/vencimientos/", dashboard.DashboardVencimientosView.as_view(), name="dashboard-vencimientos"),
+    path("reportes/vencimientos.pdf", reportes.ReporteVencimientosView.as_view(), name="reporte-vencimientos"),
+    path("reportes/cumplimiento/", reportes.ReporteCumplimientoView.as_view(), name="reporte-cumplimiento"),
+    path("mobile/offline-dataset/", mobile.MobileOfflineDatasetView.as_view(), name="mobile-offline-dataset"),
     path("notificaciones/", notificaciones.NotificacionListView.as_view(), name="notificaciones"),
     path("notificaciones/contador/", notificaciones.NotificacionContadorView.as_view(), name="notificaciones-contador"),
     path("notificaciones/leer/", notificaciones.NotificacionLeerView.as_view(), name="notificaciones-leer"),
     path("public/qr/<uuid:token>/", views.QRPublicoView.as_view(), name="qr-publico"),
 ] + router.urls
+
+
+
+
