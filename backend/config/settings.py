@@ -116,8 +116,16 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "es-ar"
 TIME_ZONE = "America/Argentina/Buenos_Aires"
+CONTROL_BLOQUEO_MESES = max(1, int(os.environ.get("CONTROL_BLOQUEO_MESES", "6")))
+ESCALADA_CONTROL_DIAS = max(1, int(os.environ.get("ESCALADA_CONTROL_DIAS", "30")))
 USE_I18N = True
 USE_TZ = True
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@dcinstall.local")
 
 # --------------------------------------------------------------------------
 # Estáticos (WhiteNoise)
@@ -137,7 +145,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOWED_ORIGINS = env_list(
     "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173" if DEBUG else ""
 )
-CORS_ALLOWED_ORIGINS += ["https://dcinstallapp-fronend.onrender.com"]
+CORS_ALLOWED_ORIGINS += ["https://dcinstallapp-fronend.onrender.com", "https://localhost", "capacitor://localhost"]
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS += ["https://dcinstallapp-fronend.onrender.com"]
 
@@ -164,6 +172,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
+    "DEFAULT_PARSER_CLASSES": ("rest_framework.parsers.JSONParser", "rest_framework.parsers.FormParser", "rest_framework.parsers.MultiPartParser"),
     # Render pone un proxy delante: la IP real viene en X-Forwarded-For
     "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "1")),
     "DEFAULT_THROTTLE_RATES": {
@@ -215,3 +224,6 @@ LOGGING = {
         "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
     },
 }
+
+
+
