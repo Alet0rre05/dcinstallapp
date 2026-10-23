@@ -194,9 +194,9 @@ export const GUIAS = [
     pasos: [
       { t: "Elegí el cliente", d: "Los equipos del archivo se van a cargar para el cliente que elijas." },
       { t: "Descargá la plantilla", d: "Tocá “Descargar plantilla (.xlsx)”." },
-      { t: "Completala", d: "Una fila por matafuego. Borrá la fila de ejemplo antes de guardar." },
+      { t: "Completala", d: "Es la planilla de extintores en blanco: una fila por matafuego, desde la fila 4. No cambies la fila de títulos (la 3)." },
       { t: "Subí el archivo", d: "Acepta .xlsx o .csv de hasta 5 MB. Tocá “Revisar archivo”." },
-      { t: "Mirá la vista previa", d: "Ves cuántas filas son válidas y cuáles tienen error, con el motivo. Revisá que no haya quedado la fila de ejemplo." },
+      { t: "Mirá la vista previa", d: "Ves cuántas filas son válidas y cuáles tienen error, con el motivo." },
       { t: "Corregí si hace falta", d: "Con un solo error se cancela toda la carga: no se guarda nada. Corregí el archivo y volvé a subirlo." },
       { t: "Confirmá", d: "Si todo está bien, tocá “Confirmar e importar”. Después podés ir directo a imprimir las etiquetas de esos equipos." },
     ],
@@ -215,6 +215,22 @@ export const GUIAS = [
       { t: "Probá en papel común", d: "Activá “Mostrar bordes” e imprimí primero en una hoja normal. Apoyala contra la adhesiva a trasluz para ver si coincide." },
       { t: "Ajustá el desplazamiento", d: "Si las etiquetas salen corridas, mové el desplazamiento X (→) e Y (↓) en milímetros, con los botones − y +." },
       { t: "Imprimí definitivo", d: "Desactivá los bordes y tocá imprimir. Antes de imprimir definitivas, confirmá que el dominio de los QR esté bien configurado; si no, aparece un aviso." },
+    ],
+  },
+
+  {
+    id: "planilla-cliente",
+    titulo: "Descargar la planilla de un cliente",
+    resumen: "Bajar en Excel la planilla de control periódico de extintores de un cliente.",
+    roles: ["OFICINA", "ADMIN"],
+    ruta: "/planillas",
+    rutaTexto: "Ir a Planillas",
+    pasos: [
+      { t: "Elegí el cliente", d: "Buscalo por nombre. Solo aparecen los clientes que tenés asignados." },
+      { t: "Elegí el mes y el año", d: "Por defecto son los actuales: van en el encabezado de la planilla." },
+      { t: "Mirá el resumen", d: "Te dice cuántos equipos activos hay, cuántos tienen datos incompletos (marca, año, agente o capacidad) y cuántos nunca tuvieron un control. El aviso no te impide descargar." },
+      { t: "Descargá la planilla", d: "Tocá “Descargar planilla (.xlsx)”. Sale una hoja por cliente, con los equipos activos ordenados por ubicación y n° de serie." },
+      { t: "Revisala y completala", d: "Prescinto, Acceso y Señalización salen en OK o NO según el último control (vacío si no hay control). Presión, chapa/baliza y vencimientos vencidos van en Observaciones. Los campos RETIRO y ENTREGA se completan a mano." },
     ],
   },
 
@@ -276,6 +292,21 @@ export const GUIAS = [
     ],
   },
 
+  {
+    id: "asignar-operarios",
+    titulo: "Asignar clientes a un operario",
+    resumen: "Elegir qué clientes de tu cartera puede ver cada operario.",
+    roles: ["OFICINA"],
+    ruta: "/panel",
+    rutaTexto: "Ir al Panel de Control",
+    pasos: [
+      { t: "Entrá a Panel de Control → Operarios", d: "Esta pestaña solo la ves si tu rol es Oficina." },
+      { t: "Buscá al operario", d: "Usá el buscador por nombre, usuario o email. Solo aparecen cuentas con rol de operario." },
+      { t: "Tocá “Clientes”", d: "Se abre una lista con los clientes de tu cartera. Los que no son tuyos no aparecen." },
+      { t: "Tildá o destildá", d: "Marcá los clientes que el operario debe ver." },
+      { t: "Guardá", d: "Tocá “Guardar clientes”. Los clientes de otras oficinas que tenga el operario no se modifican." },
+    ],
+  },
   // ------------------------------------------------------------------ ADMIN
   {
     id: "asignar-rol",

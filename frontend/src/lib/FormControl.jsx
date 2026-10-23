@@ -5,7 +5,7 @@ import { vibrar } from "./haptico.js";
 /** Formulario "Nuevo control". Lo usan la ficha de Matafuegos y el escaneo de QR (ScanQR). */
 export function FormControl({ matafuego, onDone }) {
   const [f, setF] = useState({
-    presion: "NORMAL", senalizacion: true, chapa_baliza: true, accesible: true,
+    presion: "NORMAL", precinto: true, senalizacion: true, chapa_baliza: true, accesible: true,
     observaciones: "", ubicacion: "", vencimiento_carga: "", vencimiento_ph: "",
   });
   const [error, setError] = useState("");
@@ -37,7 +37,8 @@ export function FormControl({ matafuego, onDone }) {
         <option value="NORMAL">Presión normal</option>
         <option value="ALTA">Presión alta</option>
       </select>
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {check("precinto", "Precinto OK")}
         {check("senalizacion", "Señalización OK")}
         {check("chapa_baliza", "Chapa/baliza OK")}
         {check("accesible", "Accesible")}
