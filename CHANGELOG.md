@@ -1,5 +1,85 @@
 # Changelog
 
+## Mejora visual global (sin cambios de API ni de base de datos)
+
+### Agregado
+- Fondo ambiental global con Canvas 2D: partículas orbitales, trazos curvos y resplandor cian/índigo en todas las rutas del frontend.
+- Transición breve al navegar entre rutas e interacciones consistentes para tarjetas, botones, navegación, campos y filas de tablas.
+- Adaptación automática al modo claro/oscuro, al tamaño de pantalla y a la preferencia del sistema de movimiento reducido.
+- Pausa del ciclo de animación cuando la pestaña queda oculta y ocultación de los efectos en impresión.
+
+### Compatibilidad
+- No incorpora dependencias de npm, migraciones, endpoints ni cambios en los flujos de negocio.
+- El lienzo decorativo no captura clics y se mantiene detrás de la interfaz, incluida la lectura y operación de controles.
+
+
+## 3.2.0 (parche)
+
+### Corregido
+- **La planilla descargada en «Planillas» no era la pedida.** El repo traía una *base provisoria* (`planilla_extintores.xlsx`) en lugar de la planilla real. Se reemplazó por la réplica exacta de «TASA CASA CENTRAL - DETALLE EXTINTORES»: logo (216×53 px, anclado a 27 px/8 px), celdas combinadas, anchos y altos, fuentes (Arial/Calibri), rotaciones de 90°, bordes finos, sin rellenos, A4 horizontal con márgenes en 0 y filtro A3:N23.
+- **«Importar» ahora descarga ese mismo formato.** `GET /api/matafuegos/plantilla-importacion/` devuelve la planilla de extintores en blanco (una sola pestaña, «EXTINTORES TASA-CASA CENTRAL») en lugar de las hojas «Equipos» + «Instrucciones». El importador ya leía ese formato (encabezado en la fila 3), así que no cambia.
+
+### Cambiado
+- La generación ya no pisa alineaciones ni el formato de fecha: Ubicación va a la izquierda, Observaciones centrada (Arial 10) y Vto. PH / Vto. Carga conservan el formato en español de la referencia (`mmm-yy`, p. ej. «ago-27»).
+- Cuerpo con bordes de la fila 4 a la 22; la fila 23 sin bordes. Más de 19 equipos clonan el estilo de la fila 4.
+- Valores de Prescinto / Acceso / Señalización: `OK` / `NO OK` (antes `NO`).
+- Listas desplegables en línea: Año, Clase (ABC, BC, A, K), Agente (POLVO, HCFC, CO2, AGUA), Capacidad (5 KG, 10 KG) y OK / NO OK. Avisan pero no bloquean si se escribe otro valor.
+- `plantillas/generar_plantilla_base.py` ahora prepara la plantilla a partir de la referencia real.
+- Textos de Importar y de la Tutoría: ya no hay fila de ejemplo que borrar.
+- Tests: `tests.py` (plantilla de importación), `tests_v30.py` (`NO OK`, formato de fecha, listas) y nuevo `tests_v32.py` (formato celda por celda).
+
+### Notas de actualización
+- No hay migraciones ni dependencias nuevas.
+
+## 3.1.0
+
+### Agregado
+- **Staff agrega y edita a mano desde `/admin/`**: Clientes y Matafuegos. Con *Staff status* alcanza (sin permisos de modelo ni rol en la app). Controles, perfiles, usuarios, tickets y auditoría **no cambian**: el staff no puede crear usuarios ni tocar roles desde el admin.
+- Auditoría de altas y ediciones hechas desde el admin: `CREACION` / `MODIFICACION`, con antes y después (la edición lee el registro de la base antes de guardar). Se registra solo si el formulario cambió algo.
+- En `MatafuegoAdmin`: búsqueda de cliente (`autocomplete`), campos en el orden de la planilla y `token_qr` de solo lectura.
+- **OFICINA asigna clientes a los OPERARIOS**: pestaña «Operarios» en Panel de Control. Endpoints nuevos `GET /api/equipo/operarios/` y `POST /api/equipo/operarios/asignar-clientes/`.
+  - Solo sobre usuarios con rol OPERARIO (si no, 403).
+  - La OFICINA solo asigna clientes de su cartera (si no, 400). Nunca quita a un operario los clientes que están fuera de su cartera.
+  - Se audita como `ASIGNACION_CLIENTES`.
+- Guía nueva en la Tutoría: «Asignar clientes a un operario» (rol OFICINA).
+- Tests nuevos en `apps/core/tests_v31.py`.
+
+### Cambiado
+- `permissions.py`: `puede_cargar_en_admin(user)`, con la misma regla que `puede_borrar_en_admin`.
+- `admin.py`: `AltaEdicionStaffMixin`, aplicado solo a `ClienteAdmin` y `MatafuegoAdmin`.
+
+### Pendiente (no incluido en esta versión)
+- **Parte A (planilla de extintores, réplica del formato oficial)**: queda para la próxima versión. El ANEXO A (prompt oficial de la planilla) no llegó completo al parche.
+
+### Notas de actualización
+- **No hay migraciones nuevas.**
+- Sin dependencias nuevas.
+- Los endpoints de `/equipo/*` existentes siguen siendo solo ADMIN.
+
+## 3.0.0
+
+### Agregado
+- **Borrar controles desde `/admin/`** (V3.0 · parte A). Pueden hacerlo los usuarios con **Staff status** (`is_staff`) y los superusuarios, uno por uno o con la acción masiva «Eliminar seleccionados», sin asignarles permisos de modelo de Django. Nadie más: **no** depende de `Perfil.rol` (un ADMIN de la app sin Staff status no puede). Regla única en `permissions.puede_borrar_en_admin`.
+- `Control.eliminar_definitivo(usuario, request)`: registra una entrada `ELIMINACION` en Auditoría (con todos los datos del control, el n° de serie del equipo y quién lo cargó) y recién después borra, en una sola transacción. `Control.delete()` sigue bloqueado y la API sigue sin DELETE/PUT/PATCH (405). El admin (`delete_model` y `delete_queryset`) pasa siempre por ahí.
+- `ControlAdmin` mejorado: columnas cliente / equipo / fecha / usuario / presión / precinto / acceso / señalización, filtros por cliente, fecha y presión, búsqueda por n° de serie y usuario, jerarquía por fecha. Sigue sin poder agregarse ni editarse.
+- **Matafuegos y Clientes** también se pueden borrar desde `/admin/` con la misma regla (cada borrado deja `ELIMINACION` en Auditoría). Los `on_delete=PROTECT` no cambian: un equipo con controles, o un cliente con equipos, no se borra hasta eliminar lo que depende de él. Nueva columna **Controles** en el admin de equipos.
+- **Planilla de extintores por cliente** (parte B): pantalla `/planillas` (OFICINA/ADMIN) y `GET /api/clientes/<id>/exportar-planilla/?mes=&anio=` que devuelve un `.xlsx` generado sobre la planilla de referencia (`apps/core/plantillas/planilla_extintores.xlsx`), con los equipos activos del cliente. Vista previa con `GET /api/clientes/<id>/exportar-planilla/resumen/` (equipos, datos incompletos, sin control). Auditoría `EXPORTACION`. Las listas desplegables de la referencia (que apuntaban a celdas vacías) se reemplazaron por listas `OK,NO`; los textos que empiezan con `=`, `+`, `-` o `@` se guardan como texto.
+- **Campos nuevos**: `Matafuego.marca`, `anio_fabricacion` (1950..año+1), `agente` (siempre en mayúsculas), `capacidad`; `Control.precinto` (`null` = sin dato en controles anteriores; casilla «Precinto OK» marcada por defecto); `Cliente.planta` (encabezado de la planilla; si está vacía se usa el nombre). Alta y edición de equipos, ficha y serializers actualizados. La vista pública del QR **no** expone nada de esto.
+- **Importación**: lee la propia planilla de extintores (busca el encabezado en las primeras 10 filas; alias `Nro de Serie`, `Año Fabric.`, `Agente Extintor`/`Agente Extintintor`, `Vto. PH`, `Vto. Carga`; ignora Puesto, Prescinto, Acceso, Señalización, Observaciones y filas sin datos), acepta fechas mes-año (día 1) y marca como error las fechas anteriores a 2000 o a más de 15 años (los «julio de 1931»). La plantilla de importación suma marca, año, agente y capacidad; los archivos de 5 columnas siguen funcionando.
+- Guía nueva en la Tutoría («Descargar la planilla de un cliente») y acciones `ELIMINACION`/`EXPORTACION` en el filtro de Auditoría.
+
+### Cambiado
+- `lib/api.js`: `api(..., { blob: true, conNombre: true })` devuelve también el nombre de archivo del servidor (sin `conNombre` todo sigue igual).
+- `tests.py`: `test_plantilla_para_staff` ahora espera las 9 columnas de la plantilla de importación (es el único test existente modificado).
+
+### Notas de actualización
+- **Hay una migración nueva** (`0003_v30_planilla_extintores`): correr `python manage.py migrate`. Solo agrega columnas con valores vacíos; no toca datos.
+- **Dependencia nueva: `Pillow`** (openpyxl la necesita para conservar el logo de la planilla): `pip install -r requirements.txt`.
+- Variable de entorno opcional `EMPRESA_RELEVADORA` (por defecto `DCINSTALL SRL`).
+- Para usar la planilla de referencia original, copiala como `backend/apps/core/plantillas/planilla_extintores.xlsx` (ver README).
+- Los tests nuevos están en `apps/core/tests_v30.py`.
+- Borrar un control **no revierte** la ubicación ni los vencimientos que ese control haya copiado al equipo; `ultimo_control`, `revisado_mes` y el semáforo se recalculan solos (un equipo sin controles queda en GRIS).
+
 ## 2.5.0
 
 ### Agregado

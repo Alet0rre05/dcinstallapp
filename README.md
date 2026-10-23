@@ -43,12 +43,15 @@ npm run dev
 | Crear/editar/baja/restaurar matafuegos | ❌ | ❌ | ❌ | ✅ (asignados) | ✅ |
 | Auditoría | ❌ | ❌ | solo lo propio | sus clientes | todo |
 | Equipo: asignar / revocar roles, clientes | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Asignar clientes a operarios (solo los de su cartera) | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 - Quien se registra queda **sin rol** ("Público registrado"): inicia sesión pero solo ve una pantalla de "cuenta sin rol".
 - El superusuario (`createsuperuser`) es ADMIN automáticamente.
 - **Asignar rol** (Panel de Control → Equipo): por email. Si el email no está registrado **no se crea la cuenta**; se informa que debe registrarse primero.
 - **Revocar** (la ✕): la cuenta no se elimina, vuelve a PÚBLICO y pierde los permisos al instante. No se puede revocar el propio rol ni el de un superusuario.
 - Los clientes se crean en `/admin/` (Django). Cada usuario con rol ve solo los clientes que tiene asignados.
+- **Asignar clientes a operarios** (Panel de Control → Operarios, solo OFICINA): la oficina elige entre sus propios clientes; nunca quita los que están fuera de su cartera.
+- **`/admin/` para el Staff (V3.1)**: un usuario con *Staff status* puede agregar y editar **Clientes y Matafuegos** a mano, y ver todos los clientes (el admin de Django no filtra por cartera). Controles, usuarios, perfiles y tickets siguen sin poder agregarse ni editarse desde el admin. Todo queda en Auditoría (`CREACION` / `MODIFICACION`).
 
 ## QR
 
@@ -57,6 +60,24 @@ Cada matafuego tiene un `token_qr` (UUID inmutable). El QR apunta a `/qr/<token>
 - Sin sesión (o sin rol / cliente no asignado): ficha pública reducida, solo lectura.
 - Con rol y cliente asignado: la misma ficha con **Nuevo control** (todos los roles) y **Editar ficha** (OFICINA/ADMIN).
 - Los controles son inmutables y actualizan ubicación/vencimientos del matafuego.
+
+## V3.1
+
+Staff agrega y edita Clientes y Matafuegos desde `/admin/` (con auditoría), y la OFICINA asigna clientes a sus operarios. Detalle en [CHANGELOG.md](CHANGELOG.md). Hay que correr `DEBUG=1 python manage.py test` (incluye `tests_v31.py`); no hay migraciones nuevas.
+
+## V3.0
+
+### Borrar desde el admin (`/admin/`)
+Los usuarios con **Staff status** (checkbox de Django) y los superusuarios pueden eliminar **controles**, **equipos** y **clientes**; no hace falta darles permisos de modelo. No tiene relación con el rol de la app (ADMIN/OFICINA/OPERARIO): para que alguien pueda borrar, tildá *Staff status* en su usuario. Cada borrado queda en **Auditoría** como `ELIMINACION` (también en la acción masiva). El control sigue siendo inmutable: solo se ve y se elimina, y la API REST no permite borrarlo. Un equipo con controles o un cliente con equipos no se borra hasta eliminar lo que depende de él (la columna *Controles* del admin de equipos muestra por qué). Borrar un control no revierte lo que haya copiado al equipo (ubicación, vencimientos).
+
+### Planilla de extintores por cliente
+En **Planillas** (OFICINA/ADMIN) elegís un cliente, el mes y el año y descargás un `.xlsx` con sus equipos activos. Se genera abriendo `backend/apps/core/plantillas/planilla_extintores.xlsx` y completándola, así que **el formato (logo, celdas combinadas, anchos, bordes) es el de ese archivo**.
+
+- **Agregar o reemplazar la planilla base:** copiá la planilla de referencia (`TASA_CASA_CENTRAL-_DETALLE_EXTINTORES-_OCTUBRE_2026.xlsx`) a una carpeta y corré `python backend/apps/core/plantillas/generar_plantilla_base.py ruta/a/la_referencia.xlsx`: borra los ejemplos y deja el cuerpo con bordes hasta la fila 22 sobre `backend/apps/core/plantillas/planilla_extintores.xlsx`. Se espera: títulos en la fila 3, datos desde la fila 4, columnas A–N y encabezado en `C1` (planta), `D2` (relevador), `F1` (año), `F2` (mes). Para más de 19 equipos se clona el estilo de la fila 4.
+- Desde la V3.2 el archivo del repo **es la planilla real** (ya no una base provisoria) y es también la plantilla que se descarga en **Importar**.
+- `EMPRESA_RELEVADORA` (variable de entorno, por defecto `DCINSTALL SRL`) va en «Relevado por:». La planta/sede del encabezado sale de `Cliente.planta` (si está vacía, del nombre del cliente; se edita en `/admin/`).
+- Prescinto / Acceso / Señalización: `OK`/`NO` según el último control; vacío si el equipo no tiene control o el dato es desconocido. Presión, chapa/baliza y vencimientos vencidos van en *Observaciones*.
+- Datos nuevos por equipo: marca, año de fabricación, agente, capacidad (y *Precinto OK* en cada control). La importación masiva también lee esta planilla.
 
 ## V2.5
 
@@ -96,7 +117,7 @@ API: `GET /api/matafuegos/?cliente=<id>&page_size=<n>` (100 por página, máx. 5
 ### Importar desde Excel (ADMIN y OFICINA)
 Menú **Importar**:
 1. Elegí el cliente (un cliente por importación; solo los asignados a tu cuenta).
-2. **Descargar plantilla** (`.xlsx`, hoja *Equipos* con encabezados y una fila de ejemplo, hoja *Instrucciones*). Borrá la fila de ejemplo.
+2. **Descargar plantilla** (`.xlsx`): la planilla de extintores en blanco, con el mismo formato que la de *Planillas*. Completá desde la fila 4.
 3. Subí el archivo (`.xlsx` o `.csv`, hasta 5 MB y 5.000 filas) y revisá la **vista previa**: filas válidas, filas con error (*"Fila 14: fecha de carga inválida"*) y las primeras filas.
 4. **Confirmar**. Es todo o nada: si una sola fila tiene error no se guarda ninguna.
 5. Al terminar, **Imprimir etiquetas de estos equipos** abre la pantalla de etiquetas con esos equipos ya seleccionados.

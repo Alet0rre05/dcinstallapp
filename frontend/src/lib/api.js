@@ -23,7 +23,13 @@ function extractMessage(data) {
   return k === "non_field_errors" ? msg : `${k}: ${msg}`;
 }
 
-export async function api(path, { method = "GET", body, auth = true, blob = false } = {}) {
+/** Nombre de archivo del header Content-Disposition (null si no está o no es legible). */
+function nombreDeDescarga(res) {
+  const m = /filename="?([^";]+)"?/i.exec(res.headers.get("Content-Disposition") || "");
+  return m ? m[1].replace(/[\\/\r\n]/g, "_") : null;
+}
+
+export async function api(path, { method = "GET", body, auth = true, blob = false, conNombre = false } = {}) {
   // FormData (subida de archivos): el navegador arma el Content-Type con su boundary.
   const esForm = typeof FormData !== "undefined" && body instanceof FormData;
   const headers = esForm ? {} : { "Content-Type": "application/json" };
@@ -34,7 +40,10 @@ export async function api(path, { method = "GET", body, auth = true, blob = fals
     headers,
     body: body ? (esForm ? body : JSON.stringify(body)) : undefined,
   });
-  if (blob && res.ok) return res.blob(); // descargas (ej. plantilla .xlsx)
+  if (blob && res.ok) {
+    // descargas (ej. plantilla .xlsx); con conNombre también devuelve el nombre que manda el servidor
+    return conNombre ? { blob: await res.blob(), nombre: nombreDeDescarga(res) } : res.blob();
+  }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data);
   return data;

@@ -36,6 +36,12 @@ export default function FichaMatafuego({ m, esStaff, esCampo, onBaja, onRestaura
         <dt className="text-slate-500">Venc. carga</dt><dd className="font-medium">{fecha(m.vencimiento_carga)}</dd>
         <dt className="text-slate-500">Venc. PH</dt><dd>{fecha(m.vencimiento_ph)}</dd>
         <dt className="text-slate-500">Último control</dt><dd>{fechaHora(m.ultimo_control)}</dd>
+        {(m.marca || m.anio_fabricacion || m.agente || m.capacidad) && (
+          <>
+            <dt className="text-slate-500">Marca / año</dt><dd>{[m.marca, m.anio_fabricacion].filter(Boolean).join(" · ") || "—"}</dd>
+            <dt className="text-slate-500">Agente / capacidad</dt><dd>{[m.agente, m.capacidad].filter(Boolean).join(" · ") || "—"}</dd>
+          </>
+        )}
       </dl>
 
       {m.problemas.length > 0 && (

@@ -88,3 +88,128 @@
   .dark .border-brand\/60 { border-color: rgba(100, 220, 244, 0.25); }
   .dark .border-brand-dark { border-color: #7dd3fc; }
 }
+
+/* ------------------------------------------------------------------------------------------
+   CAPA VISUAL GLOBAL — animaciones ambientales inspiradas en Villex, adaptadas a DC INSTALL.
+   La capa es decorativa: nunca captura eventos ni se interpone entre el usuario y la interfaz.
+   ------------------------------------------------------------------------------------------ */
+.dci-visual-shell {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+}
+
+.dci-ambient-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.9;
+}
+
+.dci-app-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+.dci-route-transition {
+  min-width: 0;
+  animation: dci-route-enter 380ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+
+
+@keyframes dci-route-enter {
+  from { opacity: 0; transform: translate3d(0, 7px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+
+/* Interacciones con respuesta visual breve y consistente en todas las rutas. */
+.card {
+  transition: border-color 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
+}
+
+.input,
+.btn,
+.btn-sec,
+.btn-acento,
+.btn-acento-sec,
+.dci-app-content nav a,
+.dci-app-content nav button {
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+}
+
+.dci-app-content nav a:focus-visible,
+.dci-app-content nav button:focus-visible,
+.input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(94, 218, 245, 0.28);
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card:hover {
+    border-color: rgba(11, 107, 135, 0.38);
+    box-shadow: 0 10px 28px rgba(11, 107, 135, 0.075);
+  }
+
+  .dark .card:hover {
+    border-color: rgba(94, 218, 245, 0.38);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(94, 218, 245, 0.055);
+  }
+
+  .dci-app-content .btn:hover,
+  .dci-app-content .btn-acento:hover,
+  .dci-app-content .btn-sec:hover,
+  .dci-app-content .btn-acento-sec:hover {
+    transform: translateY(-1px);
+  }
+
+  .dci-app-content .btn:active,
+  .dci-app-content .btn-acento:active,
+  .dci-app-content .btn-sec:active,
+  .dci-app-content .btn-acento-sec:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  .dci-app-content tbody tr {
+    transition: background-color 150ms ease;
+  }
+
+  .dci-app-content tbody tr:hover {
+    background-color: rgba(94, 218, 245, 0.09);
+  }
+}
+
+.dark .dci-ambient-canvas {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dci-route-transition {
+    animation: none !important;
+  }
+
+  .card,
+  .input,
+  .btn,
+  .btn-sec,
+  .btn-acento,
+  .btn-acento-sec,
+  .dci-app-content nav a,
+  .dci-app-content nav button,
+  .dci-app-content tbody tr {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .dci-ambient-canvas { display: none !important; }
+  .dci-route-transition { animation: none !important; }
+}

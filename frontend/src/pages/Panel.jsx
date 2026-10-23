@@ -2,12 +2,21 @@ import { useState } from "react";
 import { useAuth } from "../lib/auth.jsx";
 import Equipo from "./Equipo.jsx";
 import Auditoria from "./Auditoria.jsx";
+import Operarios from "./Operarios.jsx";
 
-/** Panel de Control: ADMIN ve Equipo + Auditoría; OFICINA/OPERARIO ven la auditoría que les corresponde. */
+/**
+ * Panel de Control: ADMIN ve Equipo + Auditoría; OFICINA ve Operarios + Auditoría (V3.1);
+ * OPERARIO ve solo la auditoría que le corresponde.
+ */
 export default function Panel() {
-  const { esAdmin } = useAuth();
-  const [tab, setTab] = useState(esAdmin ? "equipo" : "auditoria");
-  const tabs = [...(esAdmin ? [["equipo", "Equipo"]] : []), ["auditoria", "Auditoría"]];
+  const { user, esAdmin } = useAuth();
+  const esOficina = user?.rol === "OFICINA";
+  const [tab, setTab] = useState(esAdmin ? "equipo" : esOficina ? "operarios" : "auditoria");
+  const tabs = [
+    ...(esAdmin ? [["equipo", "Equipo"]] : []),
+    ...(esOficina ? [["operarios", "Operarios"]] : []),
+    ["auditoria", "Auditoría"],
+  ];
 
   return (
     <div>
@@ -30,6 +39,7 @@ export default function Panel() {
         </div>
       </div>
       {tab === "equipo" && esAdmin && <Equipo />}
+      {tab === "operarios" && esOficina && <Operarios />}
       {tab === "auditoria" && <Auditoria />}
     </div>
   );
