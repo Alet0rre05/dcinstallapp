@@ -27,7 +27,7 @@ const ordenar = (lista) =>
 /** Trae TODOS los equipos del cliente recorriendo las páginas (data.next). */
 async function cargarEquiposDeCliente(clienteId, incluirBajas) {
   let todos = [];
-  for (let page = 1; page <= 50; page++) {
+  for (let page = 1; ; page++) {
     const q = `cliente=${clienteId}&page_size=500&page=${page}${incluirBajas ? "&incluir_inactivos=1" : ""}`;
     const data = await api(`/matafuegos/?${q}`);
     todos = todos.concat(data.results);
