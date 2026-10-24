@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DC INSTALL</string>
+    <string name="title_activity_main">DC INSTALL</string>
+    <string name="package_name">com.dcinstall.app</string>
+    <string name="custom_url_scheme">com.dcinstall.app</string>
+</resources>
