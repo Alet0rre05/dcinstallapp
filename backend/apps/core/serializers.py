@@ -1,3 +1,7 @@
+import calendar
+from datetime import date
+from django.conf import settings
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
@@ -57,7 +61,7 @@ class RegistroSerializer(serializers.Serializer):
 class ClienteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cliente
-        fields = ["id", "nombre", "contacto"]
+        fields = ["id", "nombre", "contacto", "planta"]
 
 
 class MeSerializer(serializers.ModelSerializer):
@@ -122,15 +126,20 @@ class MatafuegoSerializer(serializers.ModelSerializer):
     cliente_nombre = serializers.CharField(source="cliente.nombre", read_only=True)
     ultimo_control = serializers.SerializerMethodField()
     revisado_mes = serializers.BooleanField(read_only=True)
+    control_bloqueo_meses = serializers.SerializerMethodField()
 
     class Meta:
         model = Matafuego
         fields = [
             "id", "cliente", "cliente_nombre", "numero_serie", "clase", "ubicacion",
+            "marca", "anio_fabricacion", "agente", "capacidad",
             "vencimiento_carga", "vencimiento_ph", "token_qr", "activo",
-            "estado_color", "problemas", "ultimo_control", "revisado_mes",
+            "estado_color", "problemas", "ultimo_control", "revisado_mes", "control_bloqueo_meses",
         ]
         read_only_fields = ["token_qr", "activo"]
+
+    def get_control_bloqueo_meses(self, obj):
+        return settings.CONTROL_BLOQUEO_MESES
 
     def get_problemas(self, obj):
         return obj.problemas()
@@ -175,15 +184,27 @@ class ImportarMatafuegosSerializer(serializers.Serializer):
 
 class ControlSerializer(serializers.ModelSerializer):
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    idempotency_key = serializers.UUIDField(required=False, allow_null=True)
+    foto_data = serializers.CharField(required=False, allow_blank=True, max_length=2500000, write_only=True)
+    firma_data = serializers.CharField(required=False, allow_blank=True, max_length=500000, write_only=True)
+    foto_adjunto = serializers.SerializerMethodField()
+    firma_capturada = serializers.SerializerMethodField()
 
     class Meta:
         model = Control
         fields = [
             "id", "matafuego", "fecha", "usuario", "usuario_nombre", "presion",
-            "senalizacion", "chapa_baliza", "accesible", "observaciones",
-            "ubicacion", "vencimiento_carga", "vencimiento_ph",
+            "precinto", "senalizacion", "chapa_baliza", "accesible", "observaciones",
+            "ubicacion", "vencimiento_carga", "vencimiento_ph", "idempotency_key",
+            "foto_data", "firma_data", "foto_adjunto", "firma_capturada", "gps_latitud", "gps_longitud",
         ]
         read_only_fields = ["fecha", "usuario"]
+
+    def get_foto_adjunto(self, obj):
+        return bool(obj.foto_data)
+
+    def get_firma_capturada(self, obj):
+        return bool(obj.firma_data)
 
     def validate_matafuego(self, matafuego):
         ids = clientes_ids(self.context["request"].user)
@@ -191,13 +212,28 @@ class ControlSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No tenés acceso a ese matafuego.")
         if not matafuego.activo:
             raise serializers.ValidationError("El matafuego está dado de baja.")
+        meses = max(1, int(getattr(settings, "CONTROL_BLOQUEO_MESES", 6)))
+        hoy = timezone.localdate()
+        indice = hoy.year * 12 + hoy.month - 1 - meses
+        anio, mes = indice // 12, indice % 12 + 1
+        limite = date(anio, mes, min(hoy.day, calendar.monthrange(anio, mes)[1]))
+        for nombre, vencimiento in (("carga", matafuego.vencimiento_carga), ("PH", matafuego.vencimiento_ph)):
+            if vencimiento and vencimiento < limite:
+                raise serializers.ValidationError(
+                    f"Control rechazado: el vencimiento de {nombre} supera el límite de {meses} meses."
+                )
         return matafuego
 
     def create(self, validated_data):
         validated_data["usuario"] = self.context["request"].user
+        self.control_creado = True
+        key = validated_data.get("idempotency_key")
+        if key:
+            existente = Control.objects.filter(idempotency_key=key).first()
+            if existente:
+                self.control_creado = False
+                return existente
         return super().create(validated_data)
-
-
 # ---------------------------------------------------------------------------
 # Soporte
 # ---------------------------------------------------------------------------
@@ -273,6 +309,30 @@ class EquipoUsuarioSerializer(serializers.ModelSerializer):
         return [{"id": c.id, "nombre": c.nombre} for c in perfil.clientes.all()]
 
 
+class EquipoOperarioSerializer(serializers.ModelSerializer):
+    """Operario para la pantalla de la OFICINA. `clientes` trae SOLO los que están dentro del
+    alcance de quien consulta (`context["alcance"]`: lista de IDs, o None = todos, ADMIN)."""
+
+    nombre = serializers.SerializerMethodField()
+    clientes = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "nombre", "email", "clientes"]
+
+    def get_nombre(self, obj):
+        return obj.get_full_name() or obj.first_name or obj.username
+
+    def get_clientes(self, obj):
+        alcance = self.context.get("alcance")
+        clientes = obj.perfil.clientes.all()  # prefetch "perfil__clientes" desde la vista
+        return [
+            {"id": c.id, "nombre": c.nombre}
+            for c in clientes
+            if alcance is None or c.id in alcance
+        ]
+
+
 class AsignarRolSerializer(serializers.Serializer):
     email = serializers.EmailField()
     rol = serializers.ChoiceField(choices=Rol.choices)
@@ -295,3 +355,7 @@ class AuditoriaSerializer(serializers.ModelSerializer):
             "id", "fecha", "usuario_nombre", "rol", "ip", "accion",
             "objeto", "objeto_id", "objeto_repr", "cliente_id", "antes", "despues",
         ]
+
+
+
+

@@ -563,18 +563,41 @@ class ImportacionMasivaTests(TestCase):
             self.assertEqual(r.status_code, 200)
             self.assertEqual(r["Content-Type"], XLSX_MIME)
             self.assertIn("plantilla_matafuegos.xlsx", r["Content-Disposition"])
+        # V3.2: es la planilla de extintores en blanco (misma que «Planillas»), una sola pestaña
         wb = load_workbook(io.BytesIO(r.content))
-        self.assertEqual(wb.sheetnames, ["Equipos", "Instrucciones"])
-        self.assertEqual([c.value for c in wb["Equipos"][1]], list(ENCABEZADO))
-        self.assertEqual(wb["Equipos"]["A2"].value, "EJEMPLO-001")  # una fila de ejemplo
-        self.assertIsNone(wb["Equipos"]["A3"].value)
+        self.assertEqual(wb.sheetnames, ["EXTINTORES TASA-CASA CENTRAL"])
+        ws = wb.worksheets[0]
+        self.assertEqual(
+            [c.value for c in ws[3]][:14],
+            ["Puesto \nNro.", "Ubicación", "Nro de Serie", "Marca", "Año Fabric.", "Clase",
+             "Agente \nExtintintor", "Capacidad", "Prescinto", "Acceso", "Señalización",
+             "Vto. PH", "Vto. Carga", "Observaciones"],
+        )
+        self.assertEqual(ws["H1"].value, "CONTROL PERIODICO DE EXTINTORES PORTÁTILES")
+        self.assertEqual(len(ws._images), 1)  # logo
+        for fila in range(4, 24):  # cuerpo en blanco, sin filas de ejemplo
+            self.assertTrue(all(c.value is None for c in ws[fila][:14]), fila)
 
-    def test_plantilla_se_puede_importar_tal_cual_menos_el_ejemplo(self):
+    def test_plantilla_en_blanco_se_rechaza_por_no_tener_filas(self):
+        # Sin equipos cargados no hay nada que importar: se avisa en lugar de «importar 0»
         r = self.api.get("/api/matafuegos/plantilla-importacion/")
         r = self.subir(r.content, dry_run=True)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("no tiene filas", r.json()["detail"])
+
+    def test_plantilla_completada_se_puede_importar(self):
+        r = self.api.get("/api/matafuegos/plantilla-importacion/")
+        wb = load_workbook(io.BytesIO(r.content))
+        ws = wb.worksheets[0]
+        ws["A4"], ws["B4"], ws["C4"], ws["D4"], ws["E4"] = 1, "Hall", "EJ-001", "KIDDE", 2022
+        ws["F4"], ws["G4"], ws["H4"] = "ABC", "POLVO", "5 KG"
+        ws["L4"], ws["M4"] = date(2030, 3, 1), date(2027, 3, 1)
+        buf = io.BytesIO()
+        wb.save(buf)
+        r = self.subir(buf.getvalue(), dry_run=True)
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual((r.json()["validas"], r.json()["con_error"]), (1, 0))
-        self.assertEqual(r.json()["muestra"][0]["numero_serie"], "EJEMPLO-001")
+        self.assertEqual(r.json()["muestra"][0]["numero_serie"], "EJ-001")
 
     def test_plantilla_prohibida_para_operario_publico_y_anonimo(self):
         for u, esperado in ((self.operario, 403), (self.publico, 403), (None, 401)):

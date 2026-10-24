@@ -31,6 +31,30 @@ def filtrar_por_cliente(queryset, user, campo="cliente_id"):
     return queryset.filter(**{f"{campo}__in": ids})
 
 
+def puede_borrar_en_admin(user):
+    """Quién puede eliminar controles, equipos y clientes desde /admin/ (V3.0).
+
+    Es el checkbox «Staff status» de Django (o ser superusuario). NO tiene nada que ver con
+    `Perfil.rol`: un ADMIN de la app sin Staff status no entra a /admin/ ni borra nada.
+    Se evalúa acá, sin asignar permisos de modelo de Django usuario por usuario."""
+    return bool(
+        user
+        and user.is_authenticated
+        and user.is_active
+        and (user.is_superuser or user.is_staff)
+    )
+
+
+def puede_cargar_en_admin(user):
+    """Quién puede AGREGAR y EDITAR Clientes y Matafuegos desde /admin/ (V3.1).
+
+    Misma regla que `puede_borrar_en_admin` (Staff status o superusuario, activo). No depende
+    de `Perfil.rol`: un staff sin rol en la app carga equipos a mano, y un ADMIN de la app
+    sin Staff status no entra. Los controles, perfiles, usuarios, tickets y auditoría NO usan
+    esta regla (ver admin.py)."""
+    return puede_borrar_en_admin(user)
+
+
 class TieneRol(BasePermission):
     """Cualquier usuario con rol (ADMIN, OFICINA u OPERARIO)."""
 

@@ -15,6 +15,10 @@ services:
         generateValue: true
       - key: DEBUG
         value: "0"
+      - key: CONTROL_BLOQUEO_MESES
+        value: "6"
+      - key: ESCALADA_CONTROL_DIAS
+        value: "30"
       - key: DATABASE_URL
         sync: false
       - key: TURNSTILE_SECRET_KEY
@@ -43,3 +47,40 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  - type: cron
+    name: dcinstall-escaladas
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    schedule: "0 12 * * *"
+    startCommand: python manage.py escalar_controles_vencidos
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: dcinstall-api
+          envVarKey: SECRET_KEY
+      - key: DATABASE_URL
+        fromService:
+          type: web
+          name: dcinstall-api
+          envVarKey: DATABASE_URL
+      - key: CONTROL_BLOQUEO_MESES
+        value: "6"
+      - key: ESCALADA_CONTROL_DIAS
+        value: "30"
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "1"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
