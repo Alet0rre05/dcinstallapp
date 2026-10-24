@@ -14,6 +14,8 @@ import Etiquetas from "./pages/Etiquetas.jsx";
 import Planillas from "./pages/Planillas.jsx";
 import Tutoria from "./pages/Tutoria.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import Reportes from "./pages/Reportes.jsx";
+import Escanear from "./pages/Escanear.jsx";
 import Layout from "./lib/Layout.jsx";
 import { Pagina } from "./lib/animado.jsx";
 
@@ -46,6 +48,8 @@ function Rutas() {
         <Route path="/etiquetas" element={<Privada><SoloStaff><Etiquetas /></SoloStaff></Privada>} />
         <Route path="/planillas" element={<Privada><SoloStaff><Planillas /></SoloStaff></Privada>} />
         <Route path="/dashboard" element={<Privada><Dashboard /></Privada>} />
+        <Route path="/reportes" element={<Privada><Reportes /></Privada>} />
+        <Route path="/escanear" element={<Privada><Escanear /></Privada>} />
         <Route path="/tickets" element={<Privada><Tickets /></Privada>} />
         <Route path="/panel" element={<Privada><Panel /></Privada>} />
         <Route path="/perfil" element={<Privada><Perfil /></Privada>} />
@@ -62,3 +66,6 @@ export default function App() {
     </Layout>
   );
 }
+
+
+
