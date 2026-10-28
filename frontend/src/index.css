@@ -197,3 +197,86 @@ html.dark body { background-color: #061426; color: #fff; }
 .dci-v7-orbit-vignette::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #061426 0%, transparent 22%, transparent 78%, rgba(6,20,38,.55) 100%); }
 @media (max-width: 1023px) { .dci-v7-orbit { opacity: .17; mask-image: none; -webkit-mask-image: none; } .dci-v7-orbit-vignette { background: rgba(6,20,38,.55); } }
 @media (prefers-reduced-motion: reduce) { .dci-v7-orbit { opacity: .23; } }
+
+/* ------------------------------------------------------------------------------------------
+   PANDORA · capa de identidad para el shell global.
+   Superficies de navegación y controles de cabecera usan vidrio controlado; las vistas de datos
+   conservan sus fondos sólidos y sus tokens de estado. Sin cambiar contratos ni lógica de negocio.
+   ------------------------------------------------------------------------------------------ */
+.dci-layout-root {
+    background-color: #070b14;
+    background-image: radial-gradient(58rem 34rem at 88% -8%, rgba(6, 182, 212, .07), transparent 62%),
+                      radial-gradient(44rem 32rem at -8% 75%, rgba(59, 130, 246, .055), transparent 68%);
+  }
+  html:not(.dark) .dci-layout-root {
+    background-color: #f4f8fc;
+    background-image: radial-gradient(55rem 32rem at 90% -10%, rgba(6, 182, 212, .08), transparent 65%),
+                      radial-gradient(42rem 30rem at 0% 78%, rgba(59, 130, 246, .045), transparent 68%);
+  }
+  .dci-v6-header { border-bottom-color: rgba(148, 163, 184, .14); }
+  .dci-v6-brand { min-width: 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 5px 18px rgba(0,0,0,.2); }
+  .dci-header-identity { white-space: nowrap; }
+  .dci-mobile-brand { background: rgba(7, 24, 43, .74); }
+  .dci-icon-button {
+    color: #e2f5ff;
+    border: 1px solid rgba(148,163,184,.24);
+    background: rgba(30,41,59,.72);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    transition: color .28s ease, background-color .28s ease, border-color .28s ease, box-shadow .28s ease;
+  }
+  .dci-icon-button:hover { color: #67e8f9; border-color: rgba(34,211,238,.52); background: rgba(30,58,78,.82); box-shadow: 0 0 20px -14px rgba(34,211,238,.8); }
+  .dci-notification-count { background: #0891b2; border: 1px solid rgba(207,250,254,.8); filter: drop-shadow(0 2px 5px rgba(6,182,212,.25)); }
+  .dci-profile-trigger { box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+  .dci-profile-menu { box-shadow: 0 24px 60px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.035); }
+  .dci-drawer {
+    background: rgba(7, 15, 29, .97);
+    border-right: 1px solid rgba(34,211,238,.24);
+    box-shadow: 18px 0 55px rgba(0,0,0,.42), inset -1px 0 0 rgba(255,255,255,.025);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition: transform .3s cubic-bezier(.22,1,.36,1), visibility .3s;
+  }
+  .dci-drawer-backdrop { background: rgba(2,6,23,.66); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .dci-drawer-heading { background: linear-gradient(135deg, rgba(6,182,212,.08), transparent 70%); }
+  .dci-menu-button { width: 40px; height: 40px; border-color: rgba(148,163,184,.22); background: rgba(30,41,59,.68); }
+  .dci-nav-link {
+    gap: .75rem;
+    min-height: 46px;
+    padding: .7rem .8rem;
+    color: #d8e5f3;
+    border-color: transparent;
+    font-size: .925rem;
+    font-weight: 550;
+    transition: background-color .28s ease, border-color .28s ease, color .28s ease, box-shadow .28s ease;
+  }
+  .dci-nav-link:hover, .dci-nav-link:focus-visible {
+    background: rgba(34,211,238,.075);
+    border-color: rgba(34,211,238,.22);
+    box-shadow: inset 3px 0 #22d3ee;
+    color: #f0fbff;
+  }
+  .dci-nav-active {
+    color: #f0fdff;
+    border-color: rgba(34,211,238,.27);
+    background: linear-gradient(100deg, rgba(8,145,178,.3), rgba(15,23,42,.42));
+    box-shadow: inset 3px 0 #22d3ee, inset 0 1px 0 rgba(255,255,255,.025);
+  }
+  .dci-nav-active:hover { background: linear-gradient(100deg, rgba(8,145,178,.38), rgba(15,23,42,.5)); }
+  .dci-drawer-account { background: rgba(2,6,23,.35); }
+  .dci-main-content { overflow-wrap: anywhere; }
+  .dci-main-content :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { max-width: 100%; }
+  .dci-main-content :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus-visible {
+    outline: 2px solid rgba(34,211,238,.9);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(6,182,212,.12);
+  }
+ .dci-profile-menu-item { text-decoration: none; }
+@media (max-width: 359px) {
+  .dci-v6-brand { padding-left: .4rem; padding-right: .4rem; }
+  .dci-v6-brand img { max-width: 94px; }
+  .dci-mobile-brand { padding-left: .85rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dci-icon-button, .dci-v6-brand, .dci-profile-trigger, .dci-profile-menu-item,
+  .dci-drawer, .dci-nav-link { transition: none !important; }
+}
