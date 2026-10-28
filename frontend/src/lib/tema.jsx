@@ -73,9 +73,9 @@ export default function BotonTema() {
       type="button"
       onClick={alternar}
       aria-pressed={oscuro}
-      aria-label="Modo oscuro"
+      aria-label={oscuro ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
       title={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-md border-2 border-ink text-ink transition-colors duration-micro hover:bg-white/60 focus-visible:ring-2 focus-visible:ring-ink active:scale-95"
+      className="dci-icon-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors active:scale-95"
     >
       {oscuro ? (
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

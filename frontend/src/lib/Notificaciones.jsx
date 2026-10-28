@@ -122,14 +122,15 @@ export default function Notificaciones() {
         aria-expanded={abierto}
         aria-controls="panel-avisos"
         aria-label={noLeidas > 0 ? `Avisos: ${noLeidas} sin leer` : "Avisos"}
-        className="relative inline-flex h-11 w-11 items-center justify-center rounded-md border-2 border-ink text-ink transition-colors duration-200 hover:bg-white/60 focus-visible:ring-2 focus-visible:ring-ink"
+        title={noLeidas > 0 ? `${noLeidas} avisos sin leer` : "Avisos"}
+        className="dci-icon-button relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z" />
           <path d="M10 20a2 2 0 0 0 4 0" />
         </svg>
         {noLeidas > 0 && (
-          <motion.span key={noLeidas} initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-acento px-1 text-xs font-bold text-white">
+          <motion.span key={noLeidas} initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} aria-hidden="true" className="dci-notification-count absolute -right-1.5 -top-1.5 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full px-1 text-xs font-bold text-white">
             {noLeidas > 99 ? "99+" : noLeidas}
           </motion.span>
         )}
