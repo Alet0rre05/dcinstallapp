@@ -7,7 +7,7 @@
       // Aplica el modo oscuro antes de pintar (evita el parpadeo blanco). Ver src/lib/tema.jsx.
       try {
         var t = localStorage.getItem("dci_tema");
-        if (t === "dark" || (t !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+        if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
           document.documentElement.classList.add("dark");
           var m = document.querySelector('meta[name="theme-color"]');
           if (m) m.setAttribute("content", "#061426");
@@ -24,12 +24,12 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Script de Live2D con el modelo de Miku -->
+    <!-- Script de Live2D con el modelo local de Miku -->
     <script src="https://cdn.jsdelivr.net/npm/live2d-widget@3.1.4/lib/L2Dwidget.min.js"></script>
     <script>
       L2Dwidget.init({
         "model": {
-          "jsonPath": "https://cdn.jsdelivr.net/gh/evrstr/live2d-widget-models/live2d_evrstr/miku/model.json"
+          "jsonPath": "/miku/model.json"
         },
         "display": {
           "position": "right",
