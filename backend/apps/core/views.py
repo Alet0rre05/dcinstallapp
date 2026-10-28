@@ -30,6 +30,7 @@ from .models import (
     Matafuego,
     MensajeChat,
     Notificacion,
+    Perfil,
     Rol,
     TicketSoporte,
 )
@@ -598,8 +599,23 @@ class TicketViewSet(
 # ---------------------------------------------------------------------------
 # Equipo: asignar / revocar roles (solo ADMIN)
 # ---------------------------------------------------------------------------
+def _perfil(user):
+    """Perfil del usuario; lo crea si falta (cuentas viejas o creadas sin el signal).
+    Devuelve SIEMPRE la misma instancia cacheada en `user.perfil`, así `rol_de(user)`
+    y los serializers ven los cambios hechos sobre ella."""
+    try:
+        return user.perfil
+    except Perfil.DoesNotExist:
+        perfil, _ = Perfil.objects.get_or_create(
+            user=user,
+            defaults={"rol": Rol.ADMIN if user.is_superuser else None},
+        )
+        user.perfil = perfil  # deja la instancia en caché
+        return perfil
+
+
 def _estado_usuario(user):
-    perfil = user.perfil
+    perfil = _perfil(user)
     return {
         "rol": rol_de(user),
         "clientes": sorted(perfil.clientes.values_list("nombre", flat=True)),
@@ -641,10 +657,11 @@ class AsignarRolView(APIView):
         if user.pk == request.user.pk:
             raise ValidationError({"detail": "No podés cambiar tu propio rol."})
         antes = _estado_usuario(user)
-        user.perfil.rol = s.validated_data["rol"]
-        user.perfil.save()
+        perfil = _perfil(user)
+        perfil.rol = s.validated_data["rol"]
+        perfil.save()
         if "clientes" in s.validated_data:
-            user.perfil.clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
+            perfil.clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
         despues = _estado_usuario(user)
         auditar(request, "ASIGNACION_ROL", "Usuario", user.pk, user.username,
                 antes=antes, despues=despues)
@@ -668,8 +685,9 @@ class RevocarRolView(APIView):
         if rol_de(user) is None:
             raise ValidationError({"detail": "El usuario ya no tiene rol."})
         antes = _estado_usuario(user)
-        user.perfil.rol = None
-        user.perfil.save()
+        perfil = _perfil(user)
+        perfil.rol = None
+        perfil.save()
         auditar(request, "REVOCACION_ROL", "Usuario", user.pk, user.username,
                 antes=antes, despues=_estado_usuario(user))
         return Response(EquipoUsuarioSerializer(user).data)
@@ -684,7 +702,7 @@ class AsignarClientesView(APIView):
         s.is_valid(raise_exception=True)
         user = get_object_or_404(User, pk=s.validated_data["user_id"])
         antes = _estado_usuario(user)
-        user.perfil.clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
+        _perfil(user).clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
         auditar(request, "ASIGNACION_CLIENTES", "Usuario", user.pk, user.username,
                 antes=antes, despues=_estado_usuario(user))
         return Response(EquipoUsuarioSerializer(user).data)
@@ -752,12 +770,12 @@ class OperarioAsignarClientesView(APIView):
             raise ValidationError({"clientes": "Alguno de los clientes no existe."})
 
         antes = _estado_usuario(user)
-        actuales = set(user.perfil.clientes.values_list("id", flat=True))
+        actuales = set(_perfil(user).clientes.values_list("id", flat=True))
         if alcance is None:
             final = pedidos  # ADMIN: asignación exacta
         else:
             final = (actuales - set(alcance)) | pedidos  # conserva lo que está fuera de la cartera
-        user.perfil.clientes.set(Cliente.objects.filter(id__in=final))
+        _perfil(user).clientes.set(Cliente.objects.filter(id__in=final))
         auditar(request, "ASIGNACION_CLIENTES", "Usuario", user.pk, user.username,
                 antes=antes, despues=_estado_usuario(user))
         return Response(EquipoOperarioSerializer(user, context={"alcance": alcance}).data)
@@ -801,5 +819,4 @@ class AuditoriaListView(generics.ListAPIView):
                     raise ValidationError({clave: "Formato de fecha inválido (AAAA-MM-DD)."})
                 qs = qs.filter(**{lookup: timezone.make_aware(datetime.combine(d, hora), tz)})
         return qs
-
 
