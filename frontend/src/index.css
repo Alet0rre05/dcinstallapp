@@ -1,0 +1,199 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Foco visible y coherente para teclado en toda la app (links, botones, checkboxes…) */
+  :focus-visible { outline: 3px solid #0B6B87; outline-offset: 2px; }
+  html { scroll-behavior: smooth; }
+}
+
+@layer components {
+  /* 16 px en los campos: evita el zoom automático de iOS al enfocar */
+  .input { @apply w-full rounded border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 placeholder:text-slate-500 hover:border-brand-dark focus:border-brand-dark focus:outline-none focus:ring-2 focus:ring-brand-dark/40; }
+  .btn { @apply inline-flex items-center justify-center rounded bg-brand-dark px-4 py-2 text-base font-semibold text-white hover:bg-brand-darker active:bg-ink disabled:opacity-50 disabled:hover:bg-brand-dark; }
+  .btn-sec { @apply inline-flex items-center justify-center rounded border border-slate-300 bg-white px-3 py-2 text-base text-ink hover:border-brand-dark hover:bg-brand-light active:bg-brand/40 disabled:opacity-50 disabled:hover:bg-white disabled:hover:border-slate-300; }
+  .card { @apply rounded-lg border border-cian-borde bg-white p-4 shadow-tarjeta transition-colors duration-panel; }
+  .link { @apply font-semibold text-brand-dark underline underline-offset-2 hover:text-brand-darker; }
+  /* Botones de las funciones nuevas (acento índigo). Mismo tamaño táctil de 44 px que .btn */
+  .btn-acento { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md bg-acento px-4 py-2 text-base font-semibold text-white transition-colors duration-200 hover:bg-acento-dark active:bg-acento-darker focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:bg-acento dark:bg-acento-btn dark:hover:bg-acento dark:active:bg-acento-dark dark:disabled:hover:bg-acento-btn dark:focus-visible:ring-acento-soft dark:focus-visible:ring-offset-slate-900; }
+  .btn-acento-sec { @apply inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-acento bg-white px-3 py-2 text-base font-semibold text-acento transition-colors duration-200 hover:bg-acento-light active:bg-acento/20 focus-visible:ring-2 focus-visible:ring-acento focus-visible:ring-offset-2 disabled:opacity-50 disabled:hover:bg-white dark:border-acento-soft dark:bg-slate-800 dark:text-acento-soft dark:hover:bg-acento-deep dark:active:bg-acento-deep dark:disabled:hover:bg-slate-800 dark:focus-visible:ring-acento-soft dark:focus-visible:ring-offset-slate-900; }
+  /* v3.3 · feedback táctil: transiciones cortas y "hundido" al tocar (transform: no mueve el layout) */
+  .btn, .btn-sec, .btn-acento, .btn-acento-sec {
+    transition-property: background-color, border-color, color, box-shadow, transform, opacity;
+    transition-duration: 160ms;
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .btn:active:not(:disabled), .btn-sec:active:not(:disabled), .btn-acento:active:not(:disabled), .btn-acento-sec:active:not(:disabled) { transform: scale(0.98); }
+  .skeleton { @apply animate-pulse rounded bg-brand/30 motion-reduce:animate-none; }
+}
+
+/* ------------------------------------------------------------------------------------------
+   MODO OSCURO (clase "dark" en <html>). Capa de compatibilidad: re-pinta las utilidades que ya
+   usan las pantallas existentes, sin tocar sus componentes. Fondos base slate-900, contenedores
+   slate-800 (nunca negro puro). Solo en pantalla: al imprimir (etiquetas) siempre sale en claro.
+   ------------------------------------------------------------------------------------------ */
+@media screen {
+  html.dark { color-scheme: dark; }
+  .dark body { background-color: #061426; color: #E6F1FF; }
+  .dark :focus-visible { outline-color: #20D6F2; }
+
+  /* superficies */
+  .dark .card { background-color: #0B2036; border-color: #17405F; box-shadow: 0 1px 0 rgba(142, 235, 250, 0.04) inset, 0 14px 32px -16px rgba(2, 8, 18, 0.7); }
+  .dark .bg-white,
+  .dark .hover\:bg-white:hover,
+  .dark .active\:bg-white:active { background-color: #0B2036; }
+  .dark .bg-white\/70,
+  .dark .hover\:bg-white\/60:hover,
+  .dark .active\:bg-white\/80:active { background-color: rgba(11, 32, 54, 0.72); }
+  .dark .bg-slate-50 { background-color: #0D2640; }
+  .dark .bg-slate-100 { background-color: #12304D; }
+  .dark .bg-slate-200 { background-color: #1B3F5E; }
+  .dark .bg-brand { background-color: #0B2036; box-shadow: 0 1px 0 #17405F; }
+  .dark .bg-brand-light,
+  .dark .hover\:bg-brand-light:hover { background-color: #0F2C47; }
+  .dark .active\:bg-brand\/30:active,
+  .dark .active\:bg-brand\/40:active { background-color: rgba(32, 214, 242, 0.14); }
+  .dark .skeleton { background-color: rgba(142, 235, 250, 0.10); }
+  .dark .bg-ink { background-color: #20D6F2; color: #061426; }
+  .dark .bg-ink.\!text-white { color: #061426 !important; }
+  .dark .bg-red-50 { background-color: #3b1d22; }
+  .dark .bg-amber-50 { background-color: #3a2f0e; }
+
+  /* campos y botones secundarios */
+  .dark .input { background-color: #061426; color: #E6F1FF; border-color: #21557B; }
+  .dark .input::placeholder { color: #9DB4CC; }
+  .dark .btn-sec { background-color: #0B2036; color: #E6F1FF; border-color: #21557B; }
+  .dark .btn-sec:hover { background-color: #0e2f3d; border-color: #20D6F2; }
+  .dark .btn-sec:disabled:hover { background-color: #0B2036; border-color: #21557B; }
+  .dark .btn { background-color: #0b6b87; }
+  .dark .btn:hover { background-color: #0e86a8; }
+
+  /* texto */
+  .dark .text-ink,
+  .dark .text-slate-800,
+  .dark .text-slate-900 { color: #E6F1FF; }
+  .dark .text-slate-700 { color: #C3D6EA; }
+  .dark .text-slate-600 { color: #B2C6DB; }
+  .dark .text-slate-500,
+  .dark .text-slate-400 { color: #9DB4CC; }
+  .dark .text-brand-dark,
+  .dark .link { color: #20D6F2; }
+  .dark .link:hover { color: #8EEBFA; }
+  .dark .text-red-600,
+  .dark .text-red-700 { color: #fca5a5; }
+  .dark .text-green-700 { color: #86efac; }
+  .dark .text-yellow-700 { color: #fde047; }
+  .dark .text-amber-900 { color: #fde68a; }
+
+  /* bordes */
+  .dark .border-slate-100,
+  .dark .border-slate-200 { border-color: #17405F; }
+  .dark .border-slate-300 { border-color: #21557B; }
+  .dark .border-red-200,
+  .dark .border-red-300 { border-color: #7f1d1d; }
+  .dark .border-amber-400 { border-color: #b45309; }
+  .dark .border-brand\/60 { border-color: #17405F; }
+  .dark .border-brand-dark { border-color: #20D6F2; }
+}
+
+/* ------------------------------------------------------------------------------------------
+   v3.3 · MOTION
+   - Al cambiar el tema a mano (tema.jsx agrega .cambiando-tema ~300 ms) los colores se funden.
+   - prefers-reduced-motion: se anulan transiciones y animaciones CSS (el canvas se queda quieto
+     y `motion` solo hace fundidos, ver <MotionConfig reducedMotion="user">).
+   ------------------------------------------------------------------------------------------ */
+@media screen {
+  html.cambiando-tema *,
+  html.cambiando-tema *::before,
+  html.cambiando-tema *::after {
+    transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* DC INSTALL · capa industrial accesible (no modifica endpoints ni pantallas). */
+@media screen {
+  .dci-navbar { background: rgba(15,23,42,.75); border-bottom: 1px solid rgba(255,255,255,.08); box-shadow: 0 8px 30px rgba(0,0,0,.4); backdrop-filter: blur(24px); }
+  .dci-menu-button { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid #20D6F288; border-radius: 10px; color: #fff; background: #1f2937; transition: background .18s, border-color .18s; }
+  .dci-menu-button:hover { background: #0B6B87; border-color: #8EEBFA; }
+  .dci-drawer-backdrop { background: rgba(0,0,0,.72); }
+  .dci-drawer { background: #101820; border-right: 2px solid #20D6F2; box-shadow: 8px 0 35px #0009; transform: translateX(-105%); visibility: hidden; transition: transform .24s ease, visibility .24s; }
+  .dci-drawer-open { transform: translateX(0); visibility: visible; }
+  .dci-nav-link { display: flex; align-items: center; min-height: 52px; width: 100%; padding: 12px 16px; border: 1px solid transparent; border-radius: 10px; color: #fff; font-size: 1rem; font-weight: 650; text-decoration: none; transition: background .18s, border-color .18s, box-shadow .18s; }
+  .dci-nav-link:hover, .dci-nav-link:focus-visible { background: #0F2C47; border-color: #20D6F2; box-shadow: inset 3px 0 #20D6F2; color: #fff; }
+  .dci-nav-active { background: #0B6B87; border-color: #20D6F2; color: #fff; }
+  html.dark body { color: #f8fafc; }
+  .dark .text-ink, .dark .text-slate-800, .dark .text-slate-900 { color: #fff; }
+  .dark .input { color: #fff; }
+  .dark .input::placeholder { color: #e2e8f0; }
+  .dci-service-card { background: #111e2d; color: #fff; border: 1px solid #0B6B87; border-radius: 14px; padding: 24px; transition: transform .2s, border-color .2s, box-shadow .2s; }
+  .dci-service-card:hover { transform: translateY(-8px); border-color: #20D6F2; box-shadow: 0 12px 30px #20D6F230; }
+  .dci-service-action { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border-radius: 8px; background: #0B6B87; padding: 10px 18px; color: #fff; font-weight: 700; }
+  .dci-service-action:hover { background: #08526A; }
+  .dci-field { width: 100%; min-height: 48px; border: 1px solid #64748b; border-radius: 8px; background: #101820; color: #fff; padding: 10px; }
+  .dci-field:focus-visible, .dci-service-action:focus-visible, .dci-nav-link:focus-visible { outline: 3px solid #8EEBFA; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .dci-drawer, .dci-service-card, .dci-nav-link { transition: none; } .dci-service-card:hover { transform: none; } }
+}
+
+/* DC Install: industrial authentication surface and navbar brand treatment */
+.dci-login-background {
+  background: radial-gradient(ellipse 65% 45% at 50% 32%, rgba(11,107,135,.22), transparent 72%),
+              radial-gradient(ellipse 50% 50% at 90% 90%, rgba(91,92,240,.14), transparent 78%), #061426;
+}
+.dci-logo-badge {
+  background: rgba(255,255,255,.95); /* Original logo has dark lettering; light enamel plaque preserves contrast. */
+  border: 1px solid rgba(255,255,255,.2);
+  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+}
+.dci-logo-badge:focus-visible { outline: 2px solid #20D6F2; outline-offset: 3px; }
+
+/* v4: full-bleed dark canvas and accessible contrast */
+html, body, #root { min-height: 100%; width: 100%; margin: 0; }
+html.dark body { background-color: #061426; color: #fff; }
+
+/* DC Install v5 · Centro de control: fondo técnico sin partículas ni cortes. */
+.dci-tech-grid {
+  background-image: linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+  background-size: 58px 58px;
+  mask-image: linear-gradient(to bottom,rgba(0,0,0,.65),transparent 95%);
+}
+.dci-login-root { color-scheme: dark; }
+@media (prefers-reduced-motion: reduce) {
+  .dci-login-root *, .dci-login-root *::before, .dci-login-root *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* DC Install v6 · Sapphire Industrial · original brand palette */
+.dci-v6-login {background: radial-gradient(ellipse 75% 90% at 8% 42%,rgba(12,85,121,.25),transparent 75%),radial-gradient(ellipse 65% 70% at 94% 82%,rgba(91,92,240,.16),transparent 76%),#061426;}
+.dci-v6-grid {background-image:linear-gradient(rgba(32,214,242,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(32,214,242,.045) 1px,transparent 1px);background-size:54px 54px;mask-image:linear-gradient(90deg,rgba(0,0,0,.75),transparent 85%);}
+.dci-v6-stage::before {content:"";position:absolute;inset:3% 2% auto 2%;height:1px;background:linear-gradient(90deg,transparent,rgba(142,235,250,.3),transparent);pointer-events:none;}
+.dci-v6-glass {isolation:isolate;box-shadow:inset 0 1px 0 rgba(210,251,255,.14),inset 0 -1px 0 rgba(0,0,0,.18),0 35px 90px -25px rgba(0,4,18,.88),0 0 75px -40px rgba(32,214,242,.32);}
+.dci-v6-glass::before {content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:linear-gradient(125deg,rgba(142,235,250,.09),transparent 32%,transparent 65%,rgba(91,92,240,.065));}
+.dci-v6-glass::after {content:"";position:absolute;top:-150%;left:-75%;width:75%;height:350%;transform:rotate(22deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.045),transparent);pointer-events:none;animation:dci-v6-sheen 12s ease-in-out infinite;}
+.dci-v6-monitor {box-shadow:inset 0 1px 0 rgba(142,235,250,.16),0 45px 100px -30px rgba(0,3,18,.85),0 0 50px -32px rgba(32,214,242,.45);transition:transform .45s cubic-bezier(.2,.8,.2,1),box-shadow .45s ease;}
+.dci-v6-monitor:hover {transform:translateY(-6px);box-shadow:inset 0 1px 0 rgba(142,235,250,.2),0 50px 110px -28px rgba(0,3,18,.9),0 0 65px -27px rgba(32,214,242,.4);}
+.dci-v6-stats > div {transition:transform .35s ease,border-color .35s ease,background .35s ease;}
+.dci-v6-stats > div:hover {transform:translateY(-4px);border-color:rgba(32,214,242,.35);background:rgba(32,214,242,.07);}
+.dci-v6-cta {position:relative;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 14px 30px -16px rgba(32,214,242,.65);}
+.dci-v6-cta::before {content:"";position:absolute;inset:0;transform:translateX(-130%) skewX(-20deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.24),transparent);transition:transform .75s ease;pointer-events:none;}
+.dci-v6-cta:hover::before {transform:translateX(130%) skewX(-20deg);}
+.dci-v6-header {box-shadow:inset 0 1px 0 rgba(142,235,250,.09),0 12px 45px rgba(0,6,25,.4);border-bottom-color:rgba(32,214,242,.13);}
+.dci-v6-brand {box-shadow:0 0 0 1px rgba(32,214,242,.12),0 6px 18px rgba(0,0,0,.32),0 0 22px -13px rgba(32,214,242,.65);}
+.dci-v6-menu:hover {box-shadow:0 0 22px -9px rgba(32,214,242,.65);}
+@keyframes dci-v6-sheen {0%,38%,100%{transform:translateX(-160%) rotate(22deg)}53%{transform:translateX(360%) rotate(22deg)}}
+@media(prefers-reduced-motion:reduce){.dci-v6-glass::after{animation:none}.dci-v6-monitor:hover,.dci-v6-stats>div:hover{transform:none}}
+
+/* v7 — original DC Install orbit animation, integrated into the Sapphire control-center login. */
+.dci-v7-orbit { opacity: .57; mask-image: linear-gradient(to right, #000 0%, #000 33%, transparent 74%); -webkit-mask-image: linear-gradient(to right, #000 0%, #000 33%, transparent 74%); }
+.dci-v7-orbit canvas { position: absolute !important; inset: 0 !important; z-index: 0 !important; width: 100% !important; height: 100% !important; }
+.dci-v7-orbit-vignette { background: linear-gradient(90deg, rgba(6,20,38,.05) 0%, rgba(6,20,38,.32) 43%, rgba(6,20,38,.85) 75%, #061426 100%); }
+.dci-v7-orbit-vignette::after { content: ''; position: absolute; inset: 0; background: linear-gradient(0deg, #061426 0%, transparent 22%, transparent 78%, rgba(6,20,38,.55) 100%); }
+@media (max-width: 1023px) { .dci-v7-orbit { opacity: .17; mask-image: none; -webkit-mask-image: none; } .dci-v7-orbit-vignette { background: rgba(6,20,38,.55); } }
+@media (prefers-reduced-motion: reduce) { .dci-v7-orbit { opacity: .23; } }

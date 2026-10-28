@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Aplica el modo oscuro antes de pintar (evita el parpadeo blanco). Ver src/lib/tema.jsx.
+      try {
+        var t = localStorage.getItem("dci_tema");
+        if (t !== "light") {
+          document.documentElement.classList.add("dark");
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute("content", "#111827");
+        }
+      } catch (e) {}
+    </script>
+    <title>DC INSTALL · Control de matafuegos</title>
+    <meta name="theme-color" content="#111827" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-pez-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-pez-192.png" />
+    <link rel="apple-touch-icon" href="/favicon-pez-192.png" />
+  </head>
+  <body class="bg-page bg-aurora-claro bg-fixed text-slate-800 transition-colors duration-panel dark:bg-aurora-noche">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

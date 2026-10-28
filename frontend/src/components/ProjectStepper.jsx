@@ -1,0 +1,4 @@
+const PASOS = ["Solicitado", "Retirado", "En taller / Recarga", "Control de calidad", "Entregado e instalado"];
+export default function ProjectStepper({ pasoActual = 0, pasos = PASOS }) {
+  return <ol aria-label="Estado de la orden" className="grid gap-3 md:grid-cols-5">{pasos.map((paso, i) => { const completo = i < pasoActual, activo = i === pasoActual; return <li key={paso} aria-current={activo ? "step" : undefined} className={`rounded-xl border p-3 text-white ${completo ? "border-green-500 bg-green-950" : activo ? "border-orange-400 bg-orange-950" : "border-slate-600 bg-[#111e2d]"}`}><div className="flex items-center gap-2"><span aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold ${completo ? "bg-green-600" : activo ? "bg-orange-600 motion-safe:animate-pulse" : "bg-slate-700"}`}>{completo ? "✓" : i + 1}</span><span className="font-semibold">{paso}</span></div></li>; })}</ol>;
+}
