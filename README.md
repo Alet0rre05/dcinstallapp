@@ -1,3 +1,22 @@
+# DCINSTALLAPP 1.8 · AURORA
+
+> Release construida sobre DCINSTALLAPP 1.7 · Jupiter. Esta versión prioriza una experiencia visual unificada y mantiene las rutas y contratos de API existentes.
+
+## Novedades de 1.8
+
+- Navegación compacta por iconos en escritorio, expandible al pasar el cursor o enfocar; menú móvil conservado. Las secciones se agrupan en Operaciones, Gestión, Analítica, Administración y Atención.
+- Tema oscuro predeterminado y tema claro opcional, con estilos de acceso adaptables.
+- Fondo ambiental Aurora compartido entre rutas, montado una sola vez desde el layout y con respeto por `prefers-reduced-motion`.
+- Tutoría dividida en **Guías paso a paso** y **Preguntas frecuentes**, con búsqueda y filtro por categoría en FAQ.
+- Acceso más visible al botón de arrepentimiento.
+- Se conservan las URLs existentes; no se introducen cambios deliberados en los contratos del backend.
+
+## Validación
+
+El build de frontend debe verificarse con `cd frontend && npm ci && npm run build`. En el entorno de edición no se pudo completar la instalación de dependencias, por lo que la compilación queda pendiente de validación en un entorno con acceso al registro npm.
+
+---
+
 # DC INSTALL v1.7 · JUPITER
 
 ## Actualización Hubble → Jupiter

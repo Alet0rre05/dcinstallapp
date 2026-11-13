@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.8.0 — Aurora
+
+### Agregado
+- Shell de navegación compacto por iconos, expandible en escritorio y organizado por áreas funcionales; el drawer existente se conserva para pantallas pequeñas.
+- Fondo Aurora global persistente entre rutas, con un único canvas compartido.
+- Tutoría con dos herramientas: guías paso a paso y FAQ desplegables con búsqueda y filtro por categoría.
+- Banner de acceso al botón de arrepentimiento con la identidad visual DCINSTALL.
+- Ajustes de tema claro para la experiencia de acceso y superficies de tutoría.
+
+### Conservado
+- Rutas públicas y privadas existentes.
+- Contratos de API y lógica de negocio del backend.
+- Persistencia local del tema y del progreso de guías.
+
+### Validación
+- `npm run build` no pudo ejecutarse: la instalación de dependencias (`npm ci`) excedió el tiempo disponible en este entorno y Vite no quedó instalado. Repetir `npm ci && npm run build` en un entorno con acceso a npm.
+
+
 ## 1.7.0 — Jupiter
 - Base multi-tenant, compliance legal, OTP y seguridad de cuenta.
 - Papelera recuperable y footer legal global.
