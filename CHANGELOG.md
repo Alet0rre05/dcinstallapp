@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.0 — Jupiter
+- Base multi-tenant, compliance legal, OTP y seguridad de cuenta.
+- Papelera recuperable y footer legal global.
+- Tema sincronizado y shell visual unificado.
+
 ## 3.3.0 (rediseño visual · solo frontend)
 
 ### Agregado

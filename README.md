@@ -1,3 +1,9 @@
+# DC INSTALL v1.7 · JUPITER
+
+## Actualización Hubble → Jupiter
+
+La edición Jupiter incorpora una base multi-tenant (organizaciones, membresías, KYB y credenciales), validación de contraseña de 15 caracteres, OTP hasheado, documentos legales versionados, solicitudes de arrepentimiento, papelera recuperable y un shell visual coherente con footer legal. La configuración se encuentra en `.env.example`; desplegar el backend con `render.yaml` y el frontend con `frontend/vercel.json`.
+
 # DCINSTALL – HUBBLE
 
 Sistema de gestión y seguimiento de matafuegos/extintores con identificación por QR. El proyecto incluye una API Django REST Framework, una interfaz web React y una aplicación Android empaquetada con Capacitor.
