@@ -1,34 +1,41 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from .models import Rol, TenantRole
+from .models import Cliente, Rol, TenantRole
+from .tenancy import LEGACY_CLIENTS, membership_for
+
+
+MEMBERSHIP_ROLES = {
+    TenantRole.TENANT_OWNER: Rol.ADMIN, TenantRole.TENANT_ADMIN: Rol.ADMIN,
+    TenantRole.TENANT_OFFICE: Rol.OFICINA, TenantRole.TENANT_OPERATOR: Rol.OPERARIO,
+    TenantRole.TENANT_CLIENT: Rol.OPERARIO,
+}
 
 
 def rol_de(user):
     """Devuelve ADMIN/OFICINA/OPERARIO, o None (= público registrado / anónimo)."""
     if not user or not user.is_authenticated:
         return None
+    membership = membership_for(user)
+    if membership:
+        return MEMBERSHIP_ROLES.get(membership.role)
     if user.is_superuser:
         return Rol.ADMIN
-    membership = user.tenant_memberships.filter(activo=True).first() if hasattr(user, "tenant_memberships") else None
-    if membership:
-        return {
-            TenantRole.TENANT_OWNER: Rol.ADMIN, TenantRole.TENANT_ADMIN: Rol.ADMIN,
-            TenantRole.TENANT_OFFICE: Rol.OFICINA, TenantRole.TENANT_OPERATOR: Rol.OPERARIO,
-            TenantRole.TENANT_CLIENT: Rol.OPERARIO,
-        }.get(membership.role)
     perfil = getattr(user, "perfil", None)
     return perfil.rol if perfil and perfil.rol else None
 
 
 def clientes_ids(user):
-    """None = acceso a todos los clientes (ADMIN); si no, lista de IDs asignados."""
+    """None indica acceso de plataforma; el resto se limita a su organización."""
     rol = rol_de(user)
-    if rol == Rol.ADMIN:
-        return None
-    perfil = getattr(user, "perfil", None)
-    if rol is None or not perfil:
+    if rol is None:
         return []
-    return list(perfil.clientes.values_list("id", flat=True))
+    membership = membership_for(user)
+    if user.is_superuser and not membership:
+        return None
+    clientes = Cliente.objects.filter(tenant=membership.tenant) if membership else Cliente.objects.filter(LEGACY_CLIENTS)
+    if rol != Rol.ADMIN:
+        clientes = clientes.filter(pk__in=user.perfil.clientes.values("pk"))
+    return clientes.values_list("pk", flat=True)
 
 
 def filtrar_por_cliente(queryset, user, campo="cliente_id"):

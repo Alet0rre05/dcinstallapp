@@ -8,7 +8,10 @@ from datetime import timedelta
 from pathlib import Path
 
 import dj_database_url
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
+
+CORS_ALLOW_HEADERS = (*default_headers, "x-tenant-slug")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

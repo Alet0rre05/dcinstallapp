@@ -509,6 +509,7 @@ class Notificacion(models.Model):
         VENCIMIENTOS = "VENCIMIENTOS", "Vencimientos"
         ESCALADA = "ESCALADA", "Escalada de control"
 
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.CASCADE)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notificaciones"
     )

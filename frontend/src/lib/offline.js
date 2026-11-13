@@ -25,7 +25,7 @@ async function writeStore(name, action) {
 }
 
 export const offlineUserId = () => localStorage.getItem("dci_user_id") || "anon";
-const cacheKey = (key) => `${offlineUserId()}:${key}`;
+const cacheKey = (key, scope = offlineUserId()) => `${scope}:${key}`;
 
 export async function cacheRead(key) {
   const db = await openDb();
@@ -36,8 +36,8 @@ export async function cacheRead(key) {
   });
 }
 
-export async function cacheWrite(key, value) {
-  return writeStore("cache", (store) => store.put({ key: cacheKey(key), value, savedAt: Date.now() }));
+export async function cacheWrite(key, value, scope = offlineUserId()) {
+  return writeStore("cache", (store) => store.put({ key: cacheKey(key, scope), value, savedAt: Date.now() }));
 }
 
 export async function guardarControlPendiente(body) {

@@ -37,9 +37,11 @@ from .models import (
     LegalDocument,
     OTPCode,
     RepentanceRequest,
+    TenantMembership,
+    TenantRole,
 )
 from .otp import OTPService
-from .tenancy import tenant_for_request
+from .tenancy import LEGACY_CLIENTS, membership_for, tenant_for_request
 from .permissions import (
     EscrituraAdmin,
     EscrituraCampo,
@@ -208,7 +210,7 @@ class RepentanceView(APIView):
 
 
 class TrashView(APIView):
-    permission_classes = [TieneRol]
+    permission_classes = [EscrituraStaff]
     def get(self, request):
         qs = filtrar_por_cliente(Matafuego.objects.filter(deleted_at__isnull=False).select_related("cliente"), request.user)
         return Response(MatafuegoSerializer(qs, many=True, context={"request": request}).data)
@@ -306,7 +308,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
         return Response(planilla.resumen(self.get_object()))
 
     def perform_create(self, serializer):
-        c = serializer.save()
+        c = serializer.save(tenant=tenant_for_request(self.request))
         auditar(self.request, "CREACION", "Cliente", c.pk, c.nombre, cliente_id=c.pk,
                 despues={"nombre": c.nombre, "contacto": c.contacto, "planta": c.planta})
 
@@ -348,13 +350,14 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        m = serializer.save()
+        m = serializer.save(tenant_id=serializer.validated_data["cliente"].tenant_id)
         auditar(self.request, "CREACION", "Matafuego", m.pk, str(m), cliente_id=m.cliente_id,
                 despues=snapshot(m, MATAFUEGO_CAMPOS))
 
     def perform_update(self, serializer):
         antes = snapshot(serializer.instance, MATAFUEGO_CAMPOS)
-        m = serializer.save()
+        cliente = serializer.validated_data.get("cliente", serializer.instance.cliente)
+        m = serializer.save(tenant_id=cliente.tenant_id)
         despues = snapshot(m, MATAFUEGO_CAMPOS)
         if antes != despues:
             auditar(self.request, "MODIFICACION", "Matafuego", m.pk, str(m),
@@ -460,7 +463,7 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        objs = [Matafuego(cliente=cliente, **fila) for fila in res.filas]
+        objs = [Matafuego(cliente=cliente, tenant_id=cliente.tenant_id, **fila) for fila in res.filas]
         try:
             with transaction.atomic():
                 creados = bulk_create_with_history(
@@ -494,6 +497,11 @@ class ControlViewSet(
     viewsets.GenericViewSet,
 ):
     """Los controles son inmutables: solo alta, listado y detalle."""
+
+    def get_permissions(self):
+        if self.action is None:
+            return [IsAuthenticated()]  # DRF responde 405 para métodos sin acción.
+        return super().get_permissions()
 
     serializer_class = ControlSerializer
     permission_classes = [EscrituraCampo]
@@ -601,7 +609,7 @@ class TicketViewSet(
     def perform_create(self, serializer):
         user = self.request.user
         texto = serializer.validated_data.pop("mensaje", None)
-        ticket = serializer.save(creado_por=user)
+        ticket = serializer.save(creado_por=user, tenant_id=serializer.validated_data["cliente"].tenant_id)
         auditar(self.request, "CREACION", "Ticket", ticket.pk, ticket.titulo,
                 cliente_id=ticket.cliente_id, despues={"titulo": ticket.titulo})
         if texto:
@@ -699,12 +707,38 @@ def _perfil(user):
         return perfil
 
 
-def _estado_usuario(user):
-    perfil = _perfil(user)
-    return {
-        "rol": rol_de(user),
-        "clientes": sorted(perfil.clientes.values_list("nombre", flat=True)),
-    }
+def _usuarios_del_equipo(request):
+    tenant = tenant_for_request(request)
+    users = User.objects.all()
+    if tenant:
+        return users.filter(tenant_memberships__tenant=tenant, tenant_memberships__activo=True)
+    return users.filter(tenant_memberships__isnull=True)
+
+
+def _usuarios_para_editar(request):
+    ids = _usuarios_del_equipo(request).values("pk")
+    return User.objects.select_for_update().filter(pk__in=ids)
+
+
+def _datos_equipo(user, request):
+    return EquipoUsuarioSerializer(user, context={"request": request}).data
+
+
+def _estado_usuario(user, request):
+    data = _datos_equipo(user, request)
+    return {"rol": data["rol"], "clientes": sorted(c["nombre"] for c in data["clientes"])}
+
+
+def _asignar_cartera(request, user, pedidos):
+    alcance = clientes_ids(request.user)
+    if alcance is not None and set(pedidos) - set(alcance):
+        raise ValidationError({"clientes": "Hay clientes fuera de tu alcance."})
+    cartera = _perfil(user).clientes
+    if alcance is None:
+        cartera.set(Cliente.objects.filter(pk__in=pedidos))
+    else:
+        cartera.remove(*cartera.filter(pk__in=alcance).exclude(pk__in=pedidos).values_list("pk", flat=True))
+        cartera.add(*pedidos)
 
 
 class EquipoListView(generics.ListAPIView):
@@ -715,7 +749,7 @@ class EquipoListView(generics.ListAPIView):
     pagination_class = ListaGrandePagination
 
     def get_queryset(self):
-        qs = User.objects.select_related("perfil").prefetch_related("perfil__clientes")
+        qs = _usuarios_del_equipo(self.request).select_related("perfil").prefetch_related("perfil__clientes")
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(
@@ -734,23 +768,32 @@ class AsignarRolView(APIView):
     def post(self, request):
         s = AsignarRolSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = User.objects.filter(email__iexact=s.validated_data["email"]).first()
+        user = _usuarios_para_editar(request).filter(email__iexact=s.validated_data["email"]).first()
         if not user:
             raise NotFound("No existe una cuenta con ese email. La persona debe registrarse primero.")
         if user.is_superuser:
             raise ValidationError({"detail": "El rol de un superusuario no puede modificarse."})
         if user.pk == request.user.pk:
             raise ValidationError({"detail": "No podés cambiar tu propio rol."})
-        antes = _estado_usuario(user)
-        perfil = _perfil(user)
-        perfil.rol = s.validated_data["rol"]
-        perfil.save()
+        antes = _estado_usuario(user, request)
+        tenant = tenant_for_request(request)
+        if tenant:
+            membership = TenantMembership.objects.select_for_update().get(tenant=tenant, user=user)
+            if membership.role == TenantRole.TENANT_OWNER:
+                raise PermissionDenied("El rol del propietario no puede modificarse.")
+            membership.role = {Rol.ADMIN: TenantRole.TENANT_ADMIN, Rol.OFICINA: TenantRole.TENANT_OFFICE,
+                               Rol.OPERARIO: TenantRole.TENANT_OPERATOR}[s.validated_data["rol"]]
+            membership.save(update_fields=["role"])
+        else:
+            perfil = _perfil(user)
+            perfil.rol = s.validated_data["rol"]
+            perfil.save(update_fields=["rol"])
         if "clientes" in s.validated_data:
-            perfil.clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
-        despues = _estado_usuario(user)
+            _asignar_cartera(request, user, s.validated_data["clientes"])
+        despues = _estado_usuario(user, request)
         auditar(request, "ASIGNACION_ROL", "Usuario", user.pk, user.username,
                 antes=antes, despues=despues)
-        return Response(EquipoUsuarioSerializer(user).data)
+        return Response(_datos_equipo(user, request))
 
 
 class RevocarRolView(APIView):
@@ -762,20 +805,28 @@ class RevocarRolView(APIView):
     def post(self, request):
         s = RevocarRolSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = get_object_or_404(User, pk=s.validated_data["user_id"])
+        user = get_object_or_404(_usuarios_para_editar(request), pk=s.validated_data["user_id"])
         if user.is_superuser:
             raise ValidationError({"detail": "El rol de un superusuario no puede revocarse."})
         if user.pk == request.user.pk:
             raise ValidationError({"detail": "No podés revocar tu propio rol."})
-        if rol_de(user) is None:
+        if _datos_equipo(user, request)["rol"] is None:
             raise ValidationError({"detail": "El usuario ya no tiene rol."})
-        antes = _estado_usuario(user)
-        perfil = _perfil(user)
-        perfil.rol = None
-        perfil.save()
+        antes = _estado_usuario(user, request)
+        tenant = tenant_for_request(request)
+        if tenant:
+            membership = TenantMembership.objects.select_for_update().get(tenant=tenant, user=user)
+            if membership.role == TenantRole.TENANT_OWNER:
+                raise PermissionDenied("El rol del propietario no puede revocarse.")
+            membership.activo = False
+            membership.save(update_fields=["activo"])
+        else:
+            perfil = _perfil(user)
+            perfil.rol = None
+            perfil.save(update_fields=["rol"])
         auditar(request, "REVOCACION_ROL", "Usuario", user.pk, user.username,
-                antes=antes, despues=_estado_usuario(user))
-        return Response(EquipoUsuarioSerializer(user).data)
+                antes=antes, despues=_estado_usuario(user, request))
+        return Response(_datos_equipo(user, request))
 
 
 class AsignarClientesView(APIView):
@@ -785,25 +836,17 @@ class AsignarClientesView(APIView):
     def post(self, request):
         s = AsignarClientesSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = get_object_or_404(User, pk=s.validated_data["user_id"])
-        antes = _estado_usuario(user)
-        _perfil(user).clientes.set(Cliente.objects.filter(id__in=s.validated_data["clientes"]))
+        user = get_object_or_404(_usuarios_para_editar(request), pk=s.validated_data["user_id"])
+        antes = _estado_usuario(user, request)
+        _asignar_cartera(request, user, s.validated_data["clientes"])
         auditar(request, "ASIGNACION_CLIENTES", "Usuario", user.pk, user.username,
-                antes=antes, despues=_estado_usuario(user))
-        return Response(EquipoUsuarioSerializer(user).data)
+                antes=antes, despues=_estado_usuario(user, request))
+        return Response(_datos_equipo(user, request))
 
 
 # ---------------------------------------------------------------------------
 # Operarios: la OFICINA asigna SUS clientes a los OPERARIOS (V3.1)
 # ---------------------------------------------------------------------------
-def _operarios_base():
-    return (
-        User.objects.filter(perfil__rol=Rol.OPERARIO, is_superuser=False)
-        .select_related("perfil")
-        .prefetch_related("perfil__clientes")
-    )
-
-
 class OperariosListView(generics.ListAPIView):
     """OFICINA/ADMIN: todos los operarios (sin superusuarios). Cada uno con los clientes
     que están dentro del alcance de quien consulta (la cartera de otras oficinas no se ve)."""
@@ -813,7 +856,13 @@ class OperariosListView(generics.ListAPIView):
     pagination_class = ListaGrandePagination
 
     def get_queryset(self):
-        qs = _operarios_base()
+        tenant = tenant_for_request(self.request)
+        if tenant:
+            qs = User.objects.filter(tenant_memberships__tenant=tenant, tenant_memberships__activo=True,
+                                     tenant_memberships__role=TenantRole.TENANT_OPERATOR)
+        else:
+            qs = _usuarios_del_equipo(self.request).filter(perfil__rol=Rol.OPERARIO)
+        qs = qs.filter(is_superuser=False).select_related("perfil").prefetch_related("perfil__clientes")
         q = self.request.query_params.get("q")
         if q:
             qs = qs.filter(
@@ -840,8 +889,8 @@ class OperarioAsignarClientesView(APIView):
     def post(self, request):
         s = AsignarClientesSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = get_object_or_404(User, pk=s.validated_data["user_id"])
-        if user.is_superuser or rol_de(user) != Rol.OPERARIO:
+        user = get_object_or_404(_usuarios_para_editar(request), pk=s.validated_data["user_id"])
+        if user.is_superuser or _datos_equipo(user, request)["rol"] != Rol.OPERARIO:
             raise PermissionDenied("Solo podés gestionar operarios.")
 
         pedidos = set(s.validated_data["clientes"])
@@ -854,7 +903,7 @@ class OperarioAsignarClientesView(APIView):
         if existentes != pedidos:
             raise ValidationError({"clientes": "Alguno de los clientes no existe."})
 
-        antes = _estado_usuario(user)
+        antes = _estado_usuario(user, request)
         actuales = set(_perfil(user).clientes.values_list("id", flat=True))
         if alcance is None:
             final = pedidos  # ADMIN: asignación exacta
@@ -862,7 +911,7 @@ class OperarioAsignarClientesView(APIView):
             final = (actuales - set(alcance)) | pedidos  # conserva lo que está fuera de la cartera
         _perfil(user).clientes.set(Cliente.objects.filter(id__in=final))
         auditar(request, "ASIGNACION_CLIENTES", "Usuario", user.pk, user.username,
-                antes=antes, despues=_estado_usuario(user))
+                antes=antes, despues=_estado_usuario(user, request))
         return Response(EquipoOperarioSerializer(user, context={"alcance": alcance}).data)
 
 
@@ -884,6 +933,11 @@ class AuditoriaListView(generics.ListAPIView):
         user = self.request.user
         rol = rol_de(user)
         qs = Auditoria.objects.all()
+        tenant = tenant_for_request(self.request)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+        elif not user.is_superuser:
+            qs = qs.filter(LEGACY_CLIENTS)
         if rol == Rol.OFICINA:
             qs = qs.filter(cliente_id__in=clientes_ids(user))
         elif rol == Rol.OPERARIO:

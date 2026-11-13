@@ -5,6 +5,17 @@ import { limpiarCacheOfflineUsuario } from "./offline.js";
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
+function guardarPerfil(perfil) {
+  const scope = perfil.tenant_slug ? `${perfil.id}@${perfil.tenant_slug}` : String(perfil.id);
+  localStorage.setItem("dci_user_id", scope);
+  localStorage.setItem("dci_offline_user", JSON.stringify(perfil));
+}
+
+function usuarioDelToken(token) {
+  try { return JSON.parse(atob(token.split(".")[1])).user_id; }
+  catch { return null; }
+}
+
 function tokenVigente(token) {
   try { return JSON.parse(atob(token.split(".")[1])).exp * 1000 > Date.now(); }
   catch { return false; }
@@ -21,14 +32,13 @@ export function AuthProvider({ children }) {
     try {
       const perfil = await api("/auth/me/");
       setUser(perfil);
-      localStorage.setItem("dci_offline_user", JSON.stringify(perfil));
-      localStorage.setItem("dci_user_id", String(perfil.id));
+      guardarPerfil(perfil);
       return perfil;
     } catch {
       const token = getToken();
       let guardado = null;
       try { guardado = JSON.parse(localStorage.getItem("dci_offline_user") || "null"); } catch {}
-      if (!navigator.onLine && token && tokenVigente(token) && guardado?.rol) {
+      if (!navigator.onLine && token && tokenVigente(token) && guardado?.rol && String(guardado.id) === String(usuarioDelToken(token))) {
         setUser(guardado);
         return guardado;
       }
@@ -52,8 +62,7 @@ export function AuthProvider({ children }) {
     const data = await api("/auth/registro/", { method: "POST", body: payload, auth: false });
     setToken(data.access);
     setUser(data.user);
-    localStorage.setItem("dci_offline_user", JSON.stringify(data.user));
-    localStorage.setItem("dci_user_id", String(data.user.id));
+    guardarPerfil(data.user);
   };
 
   const logout = () => { limpiarCacheOfflineUsuario().catch(() => {}); localStorage.removeItem("dci_offline_user"); localStorage.removeItem("dci_user_id"); setToken(null); setUser(null); };

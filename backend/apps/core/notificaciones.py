@@ -16,8 +16,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import DIAS_POR_VENCER, Matafuego, Notificacion, Rol
+from .models import DIAS_POR_VENCER, Matafuego, Notificacion, Rol, TenantRole
 from .permissions import TieneRol, filtrar_por_cliente, rol_de
+from .tenancy import LEGACY_CLIENTS, membership_for
 
 User = get_user_model()
 MAX_LISTA = 50
@@ -27,13 +28,28 @@ SYNC_SEGUNDOS = 6 * 3600
 # ---------------------------------------------------------------------------
 # Generación
 # ---------------------------------------------------------------------------
-def _staff_del_cliente(cliente_id):
-    """ADMIN (ven todo) y OFICINA con ese cliente asignado."""
-    return User.objects.filter(is_active=True).filter(
-        Q(is_superuser=True)
-        | Q(perfil__rol=Rol.ADMIN)
-        | Q(perfil__rol=Rol.OFICINA, perfil__clientes=cliente_id)
-    ).distinct()
+def staff_del_cliente(cliente):
+    users = User.objects.filter(is_active=True)
+    roles = [TenantRole.TENANT_ADMIN, TenantRole.TENANT_OWNER]
+    members = users.filter(tenant_memberships__tenant_id=cliente.tenant_id,
+                           tenant_memberships__tenant__activo=True, tenant_memberships__activo=True,
+                           tenant_memberships__role__in=roles)
+    office = users.filter(tenant_memberships__tenant_id=cliente.tenant_id,
+                          tenant_memberships__tenant__activo=True, tenant_memberships__activo=True,
+                          tenant_memberships__role=TenantRole.TENANT_OFFICE, perfil__clientes=cliente)
+    result = users.filter(is_superuser=True, tenant_memberships__isnull=True)
+    if not cliente.tenant_id or cliente.tenant.slug == "legacy":
+        result |= users.filter(tenant_memberships__isnull=True).filter(
+            Q(perfil__rol=Rol.ADMIN) | Q(perfil__rol=Rol.OFICINA, perfil__clientes=cliente))
+    return (result | members | office).distinct()
+
+
+def _propias(user):
+    qs = Notificacion.objects.filter(usuario=user)
+    membership = membership_for(user)
+    if membership:
+        return qs.filter(tenant_id=membership.tenant_id)
+    return qs if user.is_superuser else qs.filter(LEGACY_CLIENTS)
 
 
 def notificar_ticket(ticket, actor, tipo, titulo, mensaje=""):
@@ -42,7 +58,7 @@ def notificar_ticket(ticket, actor, tipo, titulo, mensaje=""):
     if rol_de(actor) in (Rol.ADMIN, Rol.OFICINA):
         destinatarios = [ticket.creado_por]
     else:
-        destinatarios = list(_staff_del_cliente(ticket.cliente_id))
+        destinatarios = list(staff_del_cliente(ticket.cliente))
     vistos = set()
     nuevas = []
     for u in destinatarios:
@@ -50,7 +66,7 @@ def notificar_ticket(ticket, actor, tipo, titulo, mensaje=""):
             continue
         vistos.add(u.pk)
         nuevas.append(Notificacion(
-            usuario=u, tipo=tipo, titulo=titulo[:80], mensaje=mensaje[:255], enlace="/tickets",
+            tenant_id=ticket.cliente.tenant_id, usuario=u, tipo=tipo, titulo=titulo[:80], mensaje=mensaje[:255], enlace="/tickets",
         ))
     if nuevas:
         Notificacion.objects.bulk_create(nuevas)
@@ -58,7 +74,9 @@ def notificar_ticket(ticket, actor, tipo, titulo, mensaje=""):
 
 def sincronizar_vencimientos(user, forzar=False):
     """Crea (si faltan) los avisos semanales de vencimientos de los clientes del usuario."""
-    if not forzar and not cache.add(f"notif-sync:{user.pk}", 1, SYNC_SEGUNDOS):
+    membership = membership_for(user)
+    scope = membership.tenant_id if membership else "legacy"
+    if not forzar and not cache.add(f"notif-sync:{user.pk}:{scope}", 1, SYNC_SEGUNDOS):
         return
     hoy = timezone.localdate()
     limite = hoy + timedelta(days=DIAS_POR_VENCER)
@@ -67,17 +85,17 @@ def sincronizar_vencimientos(user, forzar=False):
     filas = (
         filtrar_por_cliente(Matafuego.objects.filter(activo=True), user)
         .order_by()
-        .values_list("cliente_id", "cliente__nombre", "vencimiento_carga", "vencimiento_ph")
+        .values_list("cliente_id", "cliente__nombre", "cliente__tenant_id", "vencimiento_carga", "vencimiento_ph")
     )
-    for cid, nombre, carga, ph in filas:
+    for cid, nombre, tenant_id, carga, ph in filas:
         fechas = [f for f in (carga, ph) if f is not None]
-        r = resumen.setdefault(cid, [nombre, 0, 0])
+        r = resumen.setdefault(cid, [nombre, 0, 0, tenant_id])
         if any(f < hoy for f in fechas):
             r[1] += 1
         elif any(f <= limite for f in fechas):
             r[2] += 1
     nuevas = []
-    for cid, (nombre, vencidos, por_vencer) in resumen.items():
+    for cid, (nombre, vencidos, por_vencer, tenant_id) in resumen.items():
         if vencidos + por_vencer == 0:
             continue
         partes = []
@@ -86,7 +104,7 @@ def sincronizar_vencimientos(user, forzar=False):
         if por_vencer:
             partes.append(f"{por_vencer} por vencer")
         nuevas.append(Notificacion(
-            usuario=user,
+            tenant_id=tenant_id, usuario=user,
             tipo=Notificacion.Tipo.VENCIMIENTOS,
             titulo=f"Vencimientos: {nombre}"[:80],
             mensaje=" y ".join(partes) + f" (próximos {DIAS_POR_VENCER} días).",
@@ -114,7 +132,7 @@ class NotificacionListView(APIView):
 
     def get(self, request):
         sincronizar_vencimientos(request.user)
-        propias = Notificacion.objects.filter(usuario=request.user)
+        propias = _propias(request.user)
         no_leidas = propias.filter(leida=False).count()
         qs = propias.filter(leida=False) if request.query_params.get("solo_no_leidas") in ("1", "true") else propias
         return Response({
@@ -130,7 +148,7 @@ class NotificacionContadorView(APIView):
 
     def get(self, request):
         sincronizar_vencimientos(request.user)
-        n = Notificacion.objects.filter(usuario=request.user, leida=False).count()
+        n = _propias(request.user).filter(leida=False).count()
         return Response({"no_leidas": n})
 
 
@@ -140,7 +158,7 @@ class NotificacionLeerView(APIView):
     permission_classes = [TieneRol]
 
     def post(self, request):
-        propias = Notificacion.objects.filter(usuario=request.user, leida=False)
+        propias = _propias(request.user).filter(leida=False)
         datos = request.data if isinstance(request.data, dict) else {}
         ids = datos.get("ids")
         if datos.get("todas") is True:
@@ -149,5 +167,5 @@ class NotificacionLeerView(APIView):
             propias.filter(pk__in=ids).update(leida=True)
         else:
             raise ValidationError({"ids": "Enviá una lista de ids o todas=true."})
-        n = Notificacion.objects.filter(usuario=request.user, leida=False).count()
+        n = _propias(request.user).filter(leida=False).count()
         return Response({"no_leidas": n})

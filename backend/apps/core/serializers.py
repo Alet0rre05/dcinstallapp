@@ -17,7 +17,8 @@ from .models import (
     MensajeChat,
     TicketSoporte,
 )
-from .permissions import clientes_ids, rol_de
+from .permissions import MEMBERSHIP_ROLES, clientes_ids, rol_de
+from .tenancy import membership_for, tenant_for_request
 from .turnstile import verificar_turnstile
 
 User = get_user_model()
@@ -65,12 +66,17 @@ class ClienteSerializer(serializers.ModelSerializer):
 
 
 class MeSerializer(serializers.ModelSerializer):
+    tenant_slug = serializers.SerializerMethodField()
     rol = serializers.SerializerMethodField()
     clientes = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "rol", "clientes"]
+        fields = ["id", "username", "email", "first_name", "rol", "clientes", "tenant_slug"]
+
+    def get_tenant_slug(self, obj):
+        membership = membership_for(obj)
+        return membership.tenant.slug if membership else None
 
     def get_rol(self, obj):
         return rol_de(obj)
@@ -229,10 +235,13 @@ class ControlSerializer(serializers.ModelSerializer):
         self.control_creado = True
         key = validated_data.get("idempotency_key")
         if key:
-            existente = Control.objects.filter(idempotency_key=key).first()
-            if existente:
+            existente, created = Control.objects.get_or_create(idempotency_key=key, defaults=validated_data)
+            if not created:
+                if (existente.usuario_id != validated_data["usuario"].pk
+                        or existente.matafuego_id != validated_data["matafuego"].pk):
+                    raise serializers.ValidationError({"idempotency_key": "Clave no disponible."})
                 self.control_creado = False
-                return existente
+            return existente
         return super().create(validated_data)
 # ---------------------------------------------------------------------------
 # Soporte
@@ -297,6 +306,10 @@ class EquipoUsuarioSerializer(serializers.ModelSerializer):
         fields = ["id", "username", "nombre", "email", "rol", "clientes", "is_superuser"]
 
     def get_rol(self, obj):
+        tenant = tenant_for_request(self.context["request"])
+        if tenant:
+            role = obj.tenant_memberships.filter(tenant=tenant, activo=True).values_list("role", flat=True).first()
+            return MEMBERSHIP_ROLES.get(role)
         return rol_de(obj)
 
     def get_nombre(self, obj):
@@ -306,7 +319,9 @@ class EquipoUsuarioSerializer(serializers.ModelSerializer):
         perfil = getattr(obj, "perfil", None)
         if not perfil:
             return []
-        return [{"id": c.id, "nombre": c.nombre} for c in perfil.clientes.all()]
+        alcance = clientes_ids(self.context["request"].user)
+        return [{"id": c.id, "nombre": c.nombre} for c in perfil.clientes.all()
+                if alcance is None or c.pk in alcance]
 
 
 class EquipoOperarioSerializer(serializers.ModelSerializer):

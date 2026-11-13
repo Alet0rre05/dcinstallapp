@@ -1,4 +1,4 @@
-import { cacheRead, cacheWrite, guardarControlPendiente } from "./offline.js";
+import { cacheRead, cacheWrite, guardarControlPendiente, offlineUserId } from "./offline.js";
 import { Capacitor } from "@capacitor/core";
 
 const DEFAULT_BASE = Capacitor.isNativePlatform() ? "https://dcinstall-api.onrender.com/api" : "http://localhost:8000/api";
@@ -56,6 +56,7 @@ async function offlineLookup(path) {
 export async function api(path, { method = "GET", body, auth = true, blob = false, conNombre = false } = {}) {
   const esForm = typeof FormData !== "undefined" && body instanceof FormData;
   const headers = esForm ? {} : { "Content-Type": "application/json" };
+  const scope = offlineUserId();
   const token = getToken();
   if (auth && token) headers.Authorization = `Bearer ${token}`;
   let res;
@@ -64,7 +65,7 @@ export async function api(path, { method = "GET", body, auth = true, blob = fals
       method, headers, body: body ? (esForm ? body : JSON.stringify(body)) : undefined,
     });
   } catch (error) {
-    if (method === "GET") {
+    if (method === "GET" && path !== "/auth/me/" && scope === offlineUserId() && token === getToken()) {
       const cached = await cacheRead(path).catch(() => undefined);
       if (cached !== undefined) return cached;
       const resolved = await offlineLookup(path);
@@ -79,9 +80,8 @@ export async function api(path, { method = "GET", body, auth = true, blob = fals
   }
   const data = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, data);
-  if (method === "GET" && !blob && data !== null) {
-    await cacheWrite(path, data).catch(() => {});
-    if (path === "/auth/me/" && data?.id) localStorage.setItem("dci_user_id", String(data.id));
+  if (method === "GET" && path !== "/auth/me/" && !blob && data !== null && scope === offlineUserId() && token === getToken()) {
+    await cacheWrite(path, data, scope).catch(() => {});
   }
   return data;
 }

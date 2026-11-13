@@ -155,7 +155,7 @@ class ControlAdmin(BorradoStaffMixin, admin.ModelAdmin):
         return puede_borrar_en_admin(request.user)
 
     def has_view_permission(self, request, obj=None):
-        return puede_borrar_en_admin(request.user)
+        return puede_borrar_en_admin(request.user) and (obj is None or request.user.is_superuser)
 
     def has_add_permission(self, request):
         return False

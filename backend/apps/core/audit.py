@@ -3,7 +3,8 @@ import ipaddress
 from datetime import date, datetime
 from uuid import UUID
 
-from .models import Auditoria
+from .models import Auditoria, Cliente
+from .tenancy import membership_for
 
 
 def ip_de(request):
@@ -40,7 +41,14 @@ def auditar(request, accion, objeto, objeto_id="", repr_="", cliente_id=None,
     from .permissions import rol_de  # evita import circular
 
     user = usuario or (request.user if request is not None and request.user.is_authenticated else None)
+    tenant_id = None
+    if cliente_id is not None:
+        tenant_id = Cliente.objects.filter(pk=cliente_id).values_list("tenant_id", flat=True).first()
+    elif request is not None and request.user.is_authenticated:
+        membership = membership_for(request.user)
+        tenant_id = membership.tenant_id if membership else None
     return Auditoria.objects.create(
+        tenant_id=tenant_id,
         usuario=user,
         usuario_nombre=(user.get_username() if user else ""),
         rol=(rol_de(user) or "PUBLICO") if user else "",
