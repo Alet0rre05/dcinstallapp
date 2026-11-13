@@ -1,6 +1,12 @@
-# DCINSTALLAPP 1.8 · AURORA
+# DCINSTALLAPP 1.8.2 · AURORA
 
 > Release construida sobre DCINSTALLAPP 1.7 · Jupiter. Esta versión prioriza una experiencia visual unificada y mantiene las rutas y contratos de API existentes.
+
+## Novedades de 1.8.2
+
+- Barra de desplazamiento del panel compacto corregida: no tapa los iconos cuando está contraído y se muestra al expandir o enfocar la navegación.
+- Sistema visual Aurora extendido a todas las rutas, manteniendo el diseño de acceso y el fondo animado global en tema claro y oscuro.
+- Sin cambios en rutas, permisos, lógica de negocio ni contratos de API.
 
 ## Novedades de 1.8
 
@@ -9,6 +15,7 @@
 - Fondo ambiental Aurora compartido entre rutas, montado una sola vez desde el layout y con respeto por `prefers-reduced-motion`.
 - Tutoría dividida en **Guías paso a paso** y **Preguntas frecuentes**, con búsqueda y filtro por categoría en FAQ.
 - Acceso más visible al botón de arrepentimiento.
+- Ampliación de la identidad Aurora a Registro, Dashboard, Reportes, Tickets, Matafuegos y Perfil, conservando sus flujos y acciones.
 - Se conservan las URLs existentes; no se introducen cambios deliberados en los contratos del backend.
 
 ## Validación

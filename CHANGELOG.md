@@ -1,6 +1,26 @@
+## 1.8.2 — Ajustes del panel lateral y consistencia visual
+
+- Se evita que la barra de desplazamiento de la navegación compacta se superponga a los iconos: queda oculta con el panel contraído y aparece al expandirlo o al navegar con el teclado. El desplazamiento continúa disponible en todo momento.
+- Se reserva espacio interno para la barra y se mejora su contraste y tamaño cuando está visible.
+- Se extiende el sistema visual Aurora (tarjetas translúcidas, campos, contraste, bordes y tablas) a las rutas operativas, administrativas y públicas que aún no lo compartían.
+- Se mantiene el diseño específico de la pantalla de acceso y el fondo animado global en los temas oscuro y claro.
+- No se modifican rutas, permisos, lógica de negocio ni contratos de API.
+
+## 1.8.1 — Ajustes de navegación y FAQ
+
+- Se quitó el logotipo duplicado de la barra lateral flotante; el logotipo principal del encabezado se conserva.
+- Se reemplazó el carácter tipo emoji del acceso a cerrar sesión por un icono SVG consistente con el resto de la interfaz.
+- Se rediseñaron las tarjetas de preguntas frecuentes con disposición en dos columnas adaptable, estados visuales abierto/cerrado y transición de contenido.
+- Cada pregunta se puede abrir y cerrar de forma independiente, como en la referencia HTML; el signo cambia de más a menos.
+
 # Changelog
 
 ## 1.8.0 — Aurora
+
+### Ampliación de pantallas operativas
+- Registro, Dashboard, Reportes, Tickets, Matafuegos y Perfil adoptan el sistema visual Aurora: superficies glass, jerarquía tipográfica, adaptación de tema claro/oscuro y espaciado responsive.
+- Se preservan formularios, filtros, paginación, datos, acciones, permisos y endpoints existentes.
+- Se agregan estados de foco visibles y transiciones de entrada respetando `prefers-reduced-motion`.
 
 ### Agregado
 - Shell de navegación compacto por iconos, expandible en escritorio y organizado por áreas funcionales; el drawer existente se conserva para pantallas pequeñas.
