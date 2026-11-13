@@ -117,7 +117,6 @@ export default function Layout({ children }) {
         </header>
 
         <aside className="dci-icon-rail print:hidden" aria-label="Navegación rápida">
-          <Link to={tieneRol ? "/dashboard" : "/tutoria"} className="dci-rail-logo" aria-label="Inicio DCINSTALL"><Logo className="h-6 w-auto" /></Link>
           <nav className="dci-rail-nav" aria-label="Secciones">
             {[
               { title: "Operaciones", items: enlaces.filter(([, label]) => ["Dashboard", "Matafuegos", "Escanear", "Etiquetas"].includes(label)) },
@@ -128,7 +127,7 @@ export default function Layout({ children }) {
               { title: "Acceso", items: enlaces.filter(([, label]) => ["Ingresar", "Registrarse"].includes(label)) },
             ].filter((g) => g.items.length).map((grupo) => <section className="dci-rail-group" key={grupo.title}><span className="dci-rail-group-title">{grupo.title}</span>{grupo.items.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className={({isActive}) => `dci-rail-link ${isActive ? "is-active" : ""}`} title={label}><IconoMenu nombre={label}/><span>{label}</span></NavLink>)}</section>)}
           </nav>
-          <div className="dci-rail-bottom">{user && <button type="button" className="dci-rail-link" onClick={salir} title="Cerrar sesión"><span aria-hidden="true">↪</span><span>Cerrar sesión</span></button>}</div>
+          <div className="dci-rail-bottom">{user && <button type="button" className="dci-rail-link" onClick={salir} title="Cerrar sesión"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg><span>Cerrar sesión</span></button>}</div>
         </aside>
 
         {!user && location.pathname === "/login" && <Link className="dci-repentance-banner" to="/arrepentimiento"><span aria-hidden="true">↗</span> Botón de arrepentimiento <span className="ml-auto text-xs opacity-75">Conocé tus derechos</span></Link>}
@@ -140,7 +139,7 @@ export default function Layout({ children }) {
           {user && <div className="dci-drawer-account border-t border-white/10 p-4"><div className="mb-3 flex min-w-0 items-center gap-3 rounded-xl border border-cyan-500/15 bg-white/[.03] p-3"><span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 font-bold text-cyan-100">{inicial}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{nombre}</span><span className="block truncate text-xs text-slate-400">{roleLabel(user.rol)}</span></span></div><button type="button" className="dci-nav-link w-full text-left" onClick={salir}><svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10 17l5-5-5-5M15 12H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg><span>Cerrar sesión</span></button></div>}
         </aside>
 
-        <main className={location.pathname === "/login" ? "relative z-[1] w-full min-w-0 flex-1" : "dci-main-content relative z-[1] mx-auto w-full max-w-7xl min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-6 lg:px-8"}>{tieneRol && <OfflineActions />}{children}</main>
+        <main className={location.pathname === "/login" ? "relative z-[1] w-full min-w-0 flex-1" : "dci-main-content dci-route-visuals relative z-[1] mx-auto w-full max-w-7xl min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-6 lg:px-8"}>{tieneRol && <OfflineActions />}{children}</main>
         <footer className="dci-footer print:hidden"><div><span>© {new Date().getFullYear()} DC INSTALL · </span><a href="https://ajrdata.com.ar" target="_blank" rel="noopener noreferrer">Hecho por AJR DATA</a></div><nav aria-label="Legal"><Link to="/legales?doc=PRIVACIDAD">Privacidad</Link><Link to="/legales?doc=TOS">Términos de uso</Link><Link to="/legales?doc=EULA">Licencia EULA</Link><Link to="/arrepentimiento">Botón de arrepentimiento</Link></nav></footer>
       </div>
     </MotionConfig>
