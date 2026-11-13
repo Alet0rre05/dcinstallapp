@@ -77,7 +77,7 @@ function Guia({ guia, hechos, onToggle, onCerrar, onReiniciar, puede }) {
         {guia.pasos.map((p, i) => (
           <li key={i}>
             <button
-              onClick={() => setPaso(i)}
+              onClick={() => { setPaso(i); vibrar(18); }}
               aria-current={i === paso ? "step" : undefined}
               aria-label={`Paso ${i + 1}: ${p.t}${hechos.includes(i) ? " (hecho)" : ""}`}
               className={`inline-flex h-11 w-11 items-center justify-center rounded-full border-2 text-base font-bold transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-acento ${
@@ -140,6 +140,9 @@ export default function Tutoria() {
 
   const [progreso, setProgreso] = useState(() => leer(k));
   const [verTodas, setVerTodas] = useState(false);
+  const [seccion, setSeccion] = useState("guias");
+  const [busquedaFaq, setBusquedaFaq] = useState("");
+  const [categoriaFaq, setCategoriaFaq] = useState("Todas");
   useEffect(() => { setProgreso(leer(k)); }, [k]);
 
   const abierta = GUIAS.find((g) => g.id === params.get("guia")) || null;
@@ -173,21 +176,33 @@ export default function Tutoria() {
     );
   }
 
+  const faqs = [
+    { categoria: "Cuenta y acceso", pregunta: "¿Cómo ingreso a DCINSTALLAPP?", respuesta: "Ingresá desde la opción Ingresar con tu usuario y contraseña. Si todavía no tenés cuenta, revisá la opción Registrarse o solicitá acceso al responsable de tu organización." },
+    { categoria: "Cuenta y acceso", pregunta: "¿Cómo cambio entre tema oscuro y claro?", respuesta: "Usá el control de tema de la barra superior. La elección queda guardada en este navegador para las próximas visitas." },
+    { categoria: "Navegación", pregunta: "¿Dónde encuentro las funciones de la aplicación?", respuesta: "Abrí el menú principal. Las opciones disponibles dependen de tu sesión y del rol asignado a tu cuenta." },
+    { categoria: "Navegación", pregunta: "¿Por qué no veo una opción del menú?", respuesta: "Algunas secciones se muestran únicamente a determinados roles. Si considerás que necesitás acceso, consultá al administrador de tu organización." },
+    { categoria: "Operaciones", pregunta: "¿Cómo consulto la información de los matafuegos?", respuesta: "Ingresá a la sección Matafuegos desde el menú. Allí podés consultar los registros habilitados para tu cuenta." },
+    { categoria: "Operaciones", pregunta: "¿Para qué sirve la sección Escanear?", respuesta: "La aplicación dispone de una sección de escaneo para acceder a flujos asociados a códigos. Los permisos y acciones disponibles dependen del rol y del registro." },
+    { categoria: "Ayuda", pregunta: "¿Cómo sigo aprendiendo a usar el sistema?", respuesta: "En esta misma pantalla podés elegir Guías para seguir procedimientos paso a paso o Preguntas frecuentes para resolver dudas habituales." },
+    { categoria: "Ayuda", pregunta: "¿Cómo contacto al equipo de soporte?", respuesta: "Ingresá a Tickets / Soporte desde el menú cuando esa opción esté habilitada para tu cuenta." },
+  ];
+  const categoriasFaq = ["Todas", ...new Set(faqs.map((f) => f.categoria))];
+  const faqsFiltradas = faqs.filter((f) => (categoriaFaq === "Todas" || f.categoria === categoriaFaq) && `${f.pregunta} ${f.respuesta}`.toLowerCase().includes(busquedaFaq.toLowerCase()));
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg bg-acento p-4 text-white shadow-sm dark:bg-acento-deep dark:text-acento-soft">
-        <h1 className="text-2xl font-bold">Tutoría</h1>
-        <p className="text-base">
-          Guías paso a paso de todo lo que podés hacer en DC INSTALL.
-          {user && user.rol ? ` Mostramos las de tu rol (${ROL_TEXTO[user.rol]}).` : " Mostramos las que no requieren rol."}
-        </p>
+    <div className="dci-tutoria space-y-5">
+      <div className="dci-tutoria-hero">
+        <span className="dci-eyebrow">CENTRO DE APRENDIZAJE · DCINSTALL</span>
+        <h1 className="dci-title">Tutoría</h1>
+        <p className="dci-subtitle">Aprendé a usar la plataforma a tu ritmo: recorré guías interactivas o encontrá respuestas rápidas.</p>
+        <div className="dci-tutoria-tabs" role="tablist" aria-label="Herramientas de tutoría">
+          <button type="button" role="tab" aria-selected={seccion === "guias"} className={seccion === "guias" ? "is-active" : ""} onClick={() => setSeccion("guias")}>▤ Guías paso a paso <span>{visibles.length}</span></button>
+          <button type="button" role="tab" aria-selected={seccion === "faq"} className={seccion === "faq" ? "is-active" : ""} onClick={() => setSeccion("faq")}>? Preguntas frecuentes <span>{faqs.length}</span></button>
+        </div>
       </div>
 
-      <label className="flex min-h-[44px] items-center gap-2 text-base">
-        <input type="checkbox" className="h-5 w-5" checked={verTodas} onChange={(e) => setVerTodas(e.target.checked)} />
-        Ver también las guías de otros roles
-      </label>
-
+      {seccion === "guias" ? <>
+      <label className="dci-tutoria-role-filter"><input type="checkbox" className="h-5 w-5" checked={verTodas} onChange={(e) => setVerTodas(e.target.checked)} /> Ver también las guías de otros roles</label>
       <ul className="grid gap-3 sm:grid-cols-2">
         {visibles.map((g) => {
           const hechos = (progreso[g.id] || []).filter((i) => i < g.pasos.length).length;
@@ -211,6 +226,21 @@ export default function Tutoria() {
           );
         })}
       </ul>
+      </> : <section className="dci-faq-panel" aria-label="Preguntas frecuentes">
+        <div className="dci-faq-tools">
+          <label className="sr-only" htmlFor="faq-search">Buscar una pregunta</label>
+          <input id="faq-search" type="search" value={busquedaFaq} onChange={(e) => setBusquedaFaq(e.target.value)} placeholder="Buscar una pregunta o palabra clave…" />
+          <label className="sr-only" htmlFor="faq-category">Filtrar por categoría</label>
+          <select id="faq-category" value={categoriaFaq} onChange={(e) => setCategoriaFaq(e.target.value)}>{categoriasFaq.map((c) => <option key={c}>{c}</option>)}</select>
+        </div>
+        <div className="dci-faq-list">
+          {faqsFiltradas.length ? faqsFiltradas.map((faq, i) => <details className="dci-faq-item" key={faq.pregunta}>
+            <summary><span><small>{faq.categoria}</small>{faq.pregunta}</span><b aria-hidden="true">＋</b></summary>
+            <p>{faq.respuesta}</p>
+          </details>) : <p className="dci-faq-empty">No encontramos preguntas con esos filtros. Probá con otra palabra o categoría.</p>}
+        </div>
+        <p className="dci-faq-note">Las respuestas describen funciones generales. Los accesos y acciones concretas pueden variar según los permisos de tu cuenta.</p>
+      </section>}
     </div>
   );
 }

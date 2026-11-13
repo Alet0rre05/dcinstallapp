@@ -1,4 +1,3 @@
-import ParticleOrbitBackground from "../lib/ParticleOrbitBackground.jsx";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/auth.jsx";
@@ -47,11 +46,9 @@ export default function Login() {
       setError(err?.status === 403 ? "Demasiados intentos fallidos. Tu IP fue bloqueada por 30 minutos." : "Usuario o contraseña incorrectos.");
     } finally { setBusy(false); }
   };
-  const inputStyle = "block w-full rounded-xl border border-white/15 bg-[#061426] px-4 py-3.5 text-base text-white placeholder:text-slate-400 outline-none transition-all duration-300 focus:border-cyan-400 focus:bg-[#061426] focus:ring-4 focus:ring-cyan-500/15";
-  return <section className="dci-login-root dci-v6-login relative isolate flex min-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden bg-[#061426] text-white">
+  const inputStyle = "dci-login-input block w-full rounded-xl border border-white/15 bg-[#061426] px-4 py-3.5 text-base text-white placeholder:text-slate-400 outline-none transition-all duration-300 focus:border-cyan-400 focus:bg-[#061426] focus:ring-4 focus:ring-cyan-500/15";
+  return <section className="dci-login-root dci-v6-login relative isolate flex min-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden bg-transparent text-white">
     <div className="pointer-events-none absolute inset-0" aria-hidden="true"><div className="dci-tech-grid dci-v6-grid absolute inset-0 opacity-50"/><div className="absolute -left-40 top-[-15%] h-[520px] w-[520px] rounded-full bg-[#0c96bb]/25 blur-[140px]"/><div className="absolute -right-44 bottom-[-25%] h-[620px] w-[620px] rounded-full bg-[#5b5cf0]/20 blur-[140px]"/><div className="absolute left-[35%] top-[30%] h-[380px] w-[380px] rounded-full bg-cyan-800/10 blur-[130px]"/><div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"/></div>
-    <div className="dci-v7-orbit pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true"><ParticleOrbitBackground /></div>
-    <div className="dci-v7-orbit-vignette pointer-events-none absolute inset-0 z-[1]" aria-hidden="true" />
     <div className="dci-v6-stage relative z-10 mx-auto grid w-full max-w-[1440px] flex-1 items-center gap-10 px-5 py-10 sm:px-10 lg:grid-cols-[1.18fr_.82fr] lg:gap-12 lg:px-16 lg:py-14 xl:gap-20">
       <div className={`hidden min-w-0 transition-all duration-700 ease-out lg:block motion-reduce:transition-none ${visible ? "translate-y-0 opacity-100" : "translate-y-7 opacity-0"}`}>
         <div className="mb-7 flex items-center gap-3"><span className="h-8 w-[3px] rounded-full bg-gradient-to-b from-cyan-400 to-[#5B5CF0]"/><span className="text-[11px] font-bold uppercase tracking-[.24em] text-cyan-300">INTELIGENCIA OPERATIVA · DC INSTALL</span></div>
