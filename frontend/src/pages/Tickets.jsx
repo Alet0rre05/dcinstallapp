@@ -133,9 +133,9 @@ export default function Tickets() {
   const total = data ? Math.max(1, Math.ceil(data.count / 5)) : 1;
 
   return (
-    <div>
-      <h1 className="mb-3 text-xl font-bold">Soporte</h1>
-      <form onSubmit={crear} className="card mb-4 space-y-2">
+    <section className="dci-page-shell dci-feature-page dci-tickets-page space-y-4">
+      <header><p className="dci-eyebrow">Centro de ayuda</p><h1 className="dci-title">Soporte</h1><p className="dci-subtitle">Creá solicitudes y seguí las respuestas del equipo.</p></header>
+      <form onSubmit={crear} className="dci-glass-card mb-4 space-y-3">
         <input className="input" maxLength={32} placeholder="Título (máx. 32 caracteres)" value={nuevo.titulo} onChange={(e) => setNuevo({ ...nuevo, titulo: e.target.value })} required />
         {user.clientes.length > 1 && (
           <select className="input" value={nuevo.cliente} onChange={(e) => setNuevo({ ...nuevo, cliente: e.target.value })}>
@@ -151,7 +151,7 @@ export default function Tickets() {
         <>
           <ul className="space-y-3">
             {data.results.map((t, i) => (
-              <Item as="li" i={i} key={t.id} className="card">
+              <Item as="li" i={i} key={t.id} className="dci-glass-card">
                 <button className="flex w-full items-center gap-3 text-left" onClick={() => setAbierto(abierto === t.id ? null : t.id)}>
                   <span className="mr-auto font-semibold">#{t.id} {t.titulo}</span>
                   <span className="text-xs text-slate-500">{t.cliente_nombre}</span>
@@ -169,6 +169,6 @@ export default function Tickets() {
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }

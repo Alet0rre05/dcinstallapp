@@ -33,10 +33,10 @@ export default function Registro() {
   );
 
   return (
-    <div className="mx-auto mt-4 max-w-sm sm:mt-10">
+    <section className="dci-page-shell dci-feature-page dci-register-page mx-auto mt-4 max-w-sm sm:mt-10">
     <Logo className="mx-auto mb-5 h-12 w-auto" />
-    <form onSubmit={enviar} className="card space-y-3">
-      <h1 className="text-2xl font-bold text-ink">Crear cuenta</h1>
+    <form onSubmit={enviar} className="dci-glass-card space-y-4">
+      <div><p className="dci-eyebrow">DCINSTALL · Acceso</p><h1 className="dci-title">Crear cuenta</h1><p className="dci-subtitle">Completá tus datos para solicitar el alta.</p></div>
       {campo("first_name", "Nombre")}
       {campo("username", "Usuario")}
       {campo("email", "Email", "email")}
@@ -48,6 +48,6 @@ export default function Registro() {
       <p className="text-sm text-slate-600">Tu cuenta se crea sin rol: no tendrá acceso al panel hasta que un administrador te asigne uno.</p>
       <p className="text-base">¿Ya tenés cuenta? <Link className="link" to="/login">Ingresá</Link></p>
     </form>
-    </div>
+    </section>
   );
 }

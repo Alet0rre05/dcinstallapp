@@ -182,27 +182,27 @@ export default function Matafuegos() {
 
   if (error && !resumen) {
     return (
-      <div className="space-y-2">
+      <section className="dci-page-shell dci-feature-page dci-matafuegos-page space-y-4">
         <p className="text-red-600">{error}</p>
         <button className="btn min-h-[44px]" onClick={cargarResumen}>Reintentar</button>
-      </div>
+      </section>
     );
   }
   if (!resumen) {
     return (
-      <div>
-        <h1 className="mb-3 text-2xl font-bold text-ink">Elegí un cliente</h1>
+      <section className="dci-page-shell dci-feature-page dci-matafuegos-page space-y-4">
+        <header><p className="dci-eyebrow">Inventario</p><h1 className="dci-title">Elegí un cliente</h1></header>
         <ListaSkeleton filas={3} alto="h-[88px]" />
-      </div>
+      </section>
     );
   }
 
   // -- Paso 1: lista de clientes -------------------------------------------
   if (!cliente) {
     return (
-      <div>
-        <h1 className="mb-1 text-2xl font-bold text-ink">Elegí un cliente</h1>
-        <p className="mb-4 text-base text-slate-600">Tocá el cliente para ver sus matafuegos.</p>
+      <section className="dci-page-shell dci-feature-page dci-matafuegos-page space-y-4">
+        <header><p className="dci-eyebrow">Inventario</p><h1 className="dci-title">Elegí un cliente</h1>
+        <p className="dci-subtitle">Tocá el cliente para ver sus matafuegos.</p></header>
         {resumen.length === 0 && (
           <EstadoVacio titulo="Todavía no tenés clientes asignados">
             Pedile a la oficina que te asigne uno.
@@ -211,14 +211,14 @@ export default function Matafuegos() {
         <ul className="space-y-3">
           {resumen.map((c, i) => <TarjetaCliente key={c.id} c={c} i={i} onAbrir={abrirCliente} />)}
         </ul>
-      </div>
+      </section>
     );
   }
 
   // -- Pasos 2 y 3: equipos del cliente y ficha ---------------------------------
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
+    <section className="dci-page-shell dci-feature-page dci-matafuegos-page space-y-4">
+      <header className="flex flex-wrap items-center gap-3">
         <button className="btn-sec min-h-[44px]" onClick={volver}>← Clientes</button>
         <h1 className="mr-auto text-2xl font-bold text-ink">{cliente.nombre}</h1>
         {esStaff && (
@@ -226,7 +226,7 @@ export default function Matafuegos() {
             <input type="checkbox" className="h-5 w-5" checked={verBajas} onChange={(e) => setVerBajas(e.target.checked)} /> Ver bajas
           </label>
         )}
-      </div>
+      </header>
 
       {esStaff && (
         <>
@@ -293,6 +293,6 @@ export default function Matafuegos() {
           onControlado={refrescar}
         />
       )}
-    </div>
+    </section>
   );
 }

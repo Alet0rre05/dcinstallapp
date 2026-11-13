@@ -43,7 +43,7 @@ export default function Perfil() {
     </label>;
   }
 
-  return <section className="dci-page-shell space-y-6">
+  return <section className="dci-page-shell dci-feature-page dci-profile-page space-y-6">
     <header><p className="dci-eyebrow">Cuenta &amp; Seguridad</p><h1 className="dci-title">Mi perfil</h1>
       <p className="dci-subtitle">Consultá tus accesos y actualizá los datos que usás para ingresar.</p></header>
     <div className="grid items-start gap-6 lg:grid-cols-12">

@@ -171,13 +171,13 @@ export default function Dashboard() {
   const t = data?.totales;
 
   return (
-    <div className="space-y-4">
+    <section className="dci-page-shell dci-feature-page dci-dashboard-page space-y-4">
       <Item i={0} className="rounded-lg bg-gradient-to-r from-cian-oscuro to-electrico p-4 text-white shadow-tarjeta dark:border dark:border-noche-borde dark:from-noche-card dark:to-electrico-deep dark:text-noche-texto dark:shadow-glow-cian">
         <h1 className="text-2xl font-bold">Dashboard de vencimientos</h1>
         <p className="text-base">Qué vence, cuándo y qué equipos necesitan atención. Solo equipos activos de tus clientes.</p>
       </Item>
 
-      <div className="card grid gap-3 sm:grid-cols-2">
+      <div className="dci-glass-card grid gap-3 sm:grid-cols-2">
         {user.clientes.length > 1 || user.rol === "ADMIN" ? (
           <label className="block text-base font-semibold text-ink">
             Cliente
@@ -287,6 +287,6 @@ export default function Dashboard() {
           </Item>
         </>
       )}
-    </div>
+    </section>
   );
 }

@@ -233,10 +233,10 @@ export default function Tutoria() {
           <label className="sr-only" htmlFor="faq-category">Filtrar por categoría</label>
           <select id="faq-category" value={categoriaFaq} onChange={(e) => setCategoriaFaq(e.target.value)}>{categoriasFaq.map((c) => <option key={c}>{c}</option>)}</select>
         </div>
-        <div className="dci-faq-list">
-          {faqsFiltradas.length ? faqsFiltradas.map((faq, i) => <details className="dci-faq-item" key={faq.pregunta}>
-            <summary><span><small>{faq.categoria}</small>{faq.pregunta}</span><b aria-hidden="true">＋</b></summary>
-            <p>{faq.respuesta}</p>
+        <div className="dci-faq-list" aria-live="polite">
+          {faqsFiltradas.length ? faqsFiltradas.map((faq) => <details className="dci-faq-item" key={faq.pregunta}>
+            <summary><span className="dci-faq-question"><small>{faq.categoria}</small><strong>{faq.pregunta}</strong></span><b className="dci-faq-toggle" aria-hidden="true">+</b></summary>
+            <div className="dci-faq-answer"><p>{faq.respuesta}</p></div>
           </details>) : <p className="dci-faq-empty">No encontramos preguntas con esos filtros. Probá con otra palabra o categoría.</p>}
         </div>
         <p className="dci-faq-note">Las respuestas describen funciones generales. Los accesos y acciones concretas pueden variar según los permisos de tu cuenta.</p>
