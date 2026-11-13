@@ -33,7 +33,13 @@ from .models import (
     Perfil,
     Rol,
     TicketSoporte,
+    LegalAcceptanceLog,
+    LegalDocument,
+    OTPCode,
+    RepentanceRequest,
 )
+from .otp import OTPService
+from .tenancy import tenant_for_request
 from .permissions import (
     EscrituraAdmin,
     EscrituraCampo,
@@ -133,6 +139,83 @@ class MeView(APIView):
         auditar(request, "CAMBIO_PERFIL", "Usuario", user.pk, user.username,
                 antes=antes, despues=despues)
         return Response(MeSerializer(user).data)
+
+
+class LegalDocumentsView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def get(self, request):
+        return Response([{"type": d.document_type, "version": d.version, "content": d.content,
+                          "sha256": d.content_sha256, "critical": d.critical}
+                         for d in LegalDocument.objects.filter(is_active=True)])
+
+
+class LegalAcceptView(APIView):
+    def post(self, request):
+        ids = request.data.get("documents", [])
+        docs = LegalDocument.objects.filter(id__in=ids, is_active=True)
+        if docs.count() != len(set(ids)):
+            raise ValidationError({"documents": "Documento legal inválido."})
+        tenant = tenant_for_request(request)
+        for d in docs:
+            LegalAcceptanceLog.objects.get_or_create(user=request.user, tenant=tenant, document=d,
+                defaults={"document_type": d.document_type, "document_version": d.version,
+                          "ip_address": request.META.get("REMOTE_ADDR"),
+                          "user_agent": request.META.get("HTTP_USER_AGENT", "")[:512],
+                          "content_sha256": d.content_sha256})
+        return Response({"accepted": docs.count()})
+
+
+class OTPRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "register"
+    def post(self, request):
+        email, purpose = request.data.get("email", "").strip().lower(), request.data.get("purpose", "VERIFY")
+        if purpose not in dict(OTPCode.PURPOSES) or not email:
+            raise ValidationError({"detail": "Solicitud OTP inválida."})
+        user = User.objects.filter(email__iexact=email).first()
+        OTPService.send(email=email, purpose=purpose, user=user)
+        return Response({"detail": "Si el correo es válido, enviamos un código de 6 dígitos."}, status=202)
+
+
+class AccountSecurityView(APIView):
+    def get(self, request):
+        p = _perfil(request.user)
+        return Response({"backup_email": p.backup_email, "privacy_mode": p.privacy_mode, "detail_view": p.detail_view})
+    def patch(self, request):
+        p = _perfil(request.user)
+        if "backup_email" in request.data:
+            email = request.data["backup_email"].strip().lower()
+            if not OTPService.verify(email=email, purpose="BACKUP", code=request.data.get("otp", ""), user=request.user):
+                raise ValidationError({"otp": "Código inválido, vencido o agotado."})
+            p.backup_email = email
+        for field in ("privacy_mode", "detail_view"):
+            if field in request.data: setattr(p, field, bool(request.data[field]))
+        p.save()
+        return self.get(request)
+
+
+class RepentanceView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def post(self, request):
+        email = request.data.get("email", "").strip().lower()
+        if not email: raise ValidationError({"email": "Indicá un email."})
+        item = RepentanceRequest.objects.create(email=email, reason=request.data.get("reason", "")[:4000])
+        return Response({"id": item.id, "detail": "Tu solicitud fue recibida."}, status=201)
+
+
+class TrashView(APIView):
+    permission_classes = [TieneRol]
+    def get(self, request):
+        qs = filtrar_por_cliente(Matafuego.objects.filter(deleted_at__isnull=False).select_related("cliente"), request.user)
+        return Response(MatafuegoSerializer(qs, many=True, context={"request": request}).data)
+    def post(self, request, pk):
+        item = get_object_or_404(filtrar_por_cliente(Matafuego.objects.all(), request.user), pk=pk, deleted_at__isnull=False)
+        item.deleted_at = None; item.activo = True; item.save(update_fields=["deleted_at", "activo"])
+        return Response(MatafuegoSerializer(item, context={"request": request}).data)
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +364,8 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
         # Baja lógica: nunca se borra el registro
         antes = snapshot(instance, MATAFUEGO_CAMPOS)
         instance.activo = False
-        instance.save(update_fields=["activo"])
+        instance.deleted_at = timezone.now()
+        instance.save(update_fields=["activo", "deleted_at"])
         auditar(self.request, "BAJA", "Matafuego", instance.pk, str(instance),
                 cliente_id=instance.cliente_id, antes=antes,
                 despues=snapshot(instance, MATAFUEGO_CAMPOS))
@@ -293,7 +377,8 @@ class MatafuegoViewSet(viewsets.ModelViewSet):
             raise ValidationError({"detail": "El matafuego ya está activo."})
         antes = snapshot(m, MATAFUEGO_CAMPOS)
         m.activo = True
-        m.save(update_fields=["activo"])
+        m.deleted_at = None
+        m.save(update_fields=["activo", "deleted_at"])
         auditar(request, "RESTAURACION", "Matafuego", m.pk, str(m), cliente_id=m.cliente_id,
                 antes=antes, despues=snapshot(m, MATAFUEGO_CAMPOS))
         return Response(self.get_serializer(m).data)

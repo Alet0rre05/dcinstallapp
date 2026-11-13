@@ -1,6 +1,6 @@
 from rest_framework.permissions import SAFE_METHODS, BasePermission
 
-from .models import Rol
+from .models import Rol, TenantRole
 
 
 def rol_de(user):
@@ -9,6 +9,13 @@ def rol_de(user):
         return None
     if user.is_superuser:
         return Rol.ADMIN
+    membership = user.tenant_memberships.filter(activo=True).first() if hasattr(user, "tenant_memberships") else None
+    if membership:
+        return {
+            TenantRole.TENANT_OWNER: Rol.ADMIN, TenantRole.TENANT_ADMIN: Rol.ADMIN,
+            TenantRole.TENANT_OFFICE: Rol.OFICINA, TenantRole.TENANT_OPERATOR: Rol.OPERARIO,
+            TenantRole.TENANT_CLIENT: Rol.OPERARIO,
+        }.get(membership.role)
     perfil = getattr(user, "perfil", None)
     return perfil.rol if perfil and perfil.rol else None
 

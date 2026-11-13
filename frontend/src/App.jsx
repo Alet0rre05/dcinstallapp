@@ -16,6 +16,8 @@ import Tutoria from "./pages/Tutoria.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Reportes from "./pages/Reportes.jsx";
 import Escanear from "./pages/Escanear.jsx";
+import Legales from "./pages/Legales.jsx";
+import Papelera from "./pages/Papelera.jsx";
 import Layout from "./lib/Layout.jsx";
 import { Pagina } from "./lib/animado.jsx";
 
@@ -43,6 +45,7 @@ function Rutas() {
         <Route path="/tutoria" element={<Tutoria />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
+        <Route path="/legales" element={<Legales />} />
         <Route path="/" element={<Privada><Matafuegos /></Privada>} />
         <Route path="/importar" element={<Privada><SoloStaff><Importar /></SoloStaff></Privada>} />
         <Route path="/etiquetas" element={<Privada><SoloStaff><Etiquetas /></SoloStaff></Privada>} />
@@ -53,6 +56,7 @@ function Rutas() {
         <Route path="/tickets" element={<Privada><Tickets /></Privada>} />
         <Route path="/panel" element={<Privada><Panel /></Privada>} />
         <Route path="/perfil" element={<Privada><Perfil /></Privada>} />
+        <Route path="/papelera" element={<Privada><Papelera /></Privada>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Pagina>

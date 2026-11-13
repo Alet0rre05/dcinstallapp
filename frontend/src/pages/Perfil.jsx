@@ -6,6 +6,7 @@ export default function Perfil() {
   const { user, recargar } = useAuth();
   const [f, setF] = useState({ first_name: user.first_name, email: user.email, new_password: "", current_password: "" });
   const [msg, setMsg] = useState({ ok: false, text: "" });
+  const passwordOk = !f.new_password || (f.new_password.length >= 15 && !/(.)\1\1/.test(f.new_password));
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -28,9 +29,10 @@ export default function Perfil() {
       <input className="input" placeholder="Nombre" value={f.first_name} onChange={(e) => setF({ ...f, first_name: e.target.value })} />
       <input className="input" type="email" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
       <input className="input" type="password" placeholder="Nueva contraseña (opcional)" value={f.new_password} onChange={(e) => setF({ ...f, new_password: e.target.value })} />
+      {f.new_password && <p className={`text-xs ${passwordOk ? "text-emerald-600" : "text-red-600"}`}>{passwordOk ? "Contraseña segura" : "Usá 15 caracteres y evitá triples repeticiones."}</p>}
       <input className="input" type="password" placeholder="Contraseña actual (obligatoria)" value={f.current_password} onChange={(e) => setF({ ...f, current_password: e.target.value })} required />
       {msg.text && <p className={`text-sm ${msg.ok ? "text-green-700" : "text-red-600"}`}>{msg.text}</p>}
-      <button className="btn">Guardar cambios</button>
+      <button className="btn" disabled={!passwordOk}>Guardar cambios</button>
     </form>
   );
 }

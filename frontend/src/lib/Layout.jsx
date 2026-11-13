@@ -76,6 +76,7 @@ export default function Layout({ children }) {
       ["/dashboard", "Dashboard"], ["/", "Matafuegos"], ["/escanear", "Escanear"], ["/reportes", "Reportes"],
       ...(esStaff ? [["/planillas", "Planillas"], ["/importar", "Importar"], ["/etiquetas", "Etiquetas"]] : []),
       ["/tickets", "Tickets / Soporte"], ["/panel", "Panel de control"], ["/perfil", "Perfil"],
+      ...(esStaff ? [["/papelera", "Papelera"]] : []),
     ] : []), ["/tutoria", "Tutoría"]
   ] : [["/tutoria", "Tutoría"], ["/login", "Ingresar"], ["/registro", "Registrarse"]];
 
@@ -121,6 +122,7 @@ export default function Layout({ children }) {
         </aside>
 
         <main className={location.pathname === "/login" ? "w-full min-w-0 flex-1" : "dci-main-content mx-auto w-full max-w-7xl min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-6 lg:px-8"}>{tieneRol && <OfflineActions />}{children}</main>
+        <footer className="dci-footer print:hidden"><div><span>© {new Date().getFullYear()} DC INSTALL · </span><a href="https://ajrdata.com.ar" target="_blank" rel="noopener noreferrer">Hecho por AJR DATA</a></div><nav aria-label="Legal"><Link to="/legales">Privacidad</Link><Link to="/legales">Términos de uso</Link><Link to="/legales">Licencia EULA</Link><a href="mailto:legal@ajrdata.com.ar?subject=Botón%20de%20arrepentimiento">Botón de arrepentimiento</a></nav></footer>
       </div>
     </MotionConfig>
   );

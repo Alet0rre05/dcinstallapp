@@ -12,6 +12,7 @@ export default function Registro() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const onToken = useCallback((t) => setToken(t), []);
+  const passwordOk = f.password.length >= 15 && !/(.)\1\1/.test(f.password);
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -39,10 +40,11 @@ export default function Registro() {
       {campo("first_name", "Nombre")}
       {campo("username", "Usuario")}
       {campo("email", "Email", "email")}
-      {campo("password", "Contraseña", "password")}
+      {campo("password", "Contraseña (mínimo 15 caracteres)", "password")}
+      <ul className="text-xs" aria-live="polite"><li className={f.password.length >= 15 ? "text-emerald-600" : "text-slate-500"}>✓ Al menos 15 caracteres</li><li className={!/(.)\1\1/.test(f.password) ? "text-emerald-600" : "text-slate-500"}>✓ Sin tres caracteres iguales seguidos</li></ul>
       <Turnstile onToken={onToken} />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      <button className="btn min-h-[44px] w-full" disabled={busy || !token}>{busy ? "Creando…" : "Registrarme"}</button>
+      <button className="btn min-h-[44px] w-full" disabled={busy || !token || !passwordOk}>{busy ? "Creando…" : "Registrarme"}</button>
       <p className="text-sm text-slate-600">Tu cuenta se crea sin rol: no tendrá acceso al panel hasta que un administrador te asigne uno.</p>
       <p className="text-base">¿Ya tenés cuenta? <Link className="link" to="/login">Ingresá</Link></p>
     </form>

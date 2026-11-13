@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 from datetime import timedelta
 
@@ -11,6 +13,92 @@ from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
 User = get_user_model()
+
+
+class Tenant(models.Model):
+    """Empresa aislada dentro de la plataforma Jupiter."""
+    class Plan(models.TextChoices):
+        STARTER = "STARTER", "Starter"
+        PROFESSIONAL = "PROFESSIONAL", "Professional"
+        ENTERPRISE = "ENTERPRISE", "Enterprise"
+    nombre = models.CharField(max_length=160)
+    slug = models.SlugField(max_length=80, unique=True)
+    cuit = models.CharField(max_length=13, blank=True)
+    plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.STARTER)
+    activo = models.BooleanField(default=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre"]
+
+    def __str__(self):
+        return self.nombre
+
+
+class TenantRole(models.TextChoices):
+    PLATFORM_SUPERADMIN = "PLATFORM_SUPERADMIN", "Plataforma: dirección"
+    PLATFORM_SUPPORT = "PLATFORM_SUPPORT", "Plataforma: soporte"
+    TENANT_OWNER = "TENANT_OWNER", "Empresa: propietario"
+    TENANT_ADMIN = "TENANT_ADMIN", "Empresa: administrador"
+    TENANT_OFFICE = "TENANT_OFFICE", "Empresa: oficina"
+    TENANT_OPERATOR = "TENANT_OPERATOR", "Empresa: técnico"
+    TENANT_CLIENT = "TENANT_CLIENT", "Empresa: cliente final"
+
+
+class TenantMembership(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="tenant_memberships")
+    role = models.CharField(max_length=30, choices=TenantRole.choices)
+    activo = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["tenant", "user"], name="uniq_tenant_membership")]
+
+
+class KYBVerification(models.Model):
+    class Estado(models.TextChoices):
+        PENDIENTE = "PENDIENTE", "Pendiente"
+        APROBADA = "APROBADA", "Aprobada"
+        RECHAZADA = "RECHAZADA", "Rechazada"
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name="kyb")
+    estado = models.CharField(max_length=12, choices=Estado.choices, default=Estado.PENDIENTE)
+    documento_url = models.URLField(blank=True)
+    revisado_por = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    revisado_at = models.DateTimeField(null=True, blank=True)
+
+
+class ProviderCredential(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="credentials")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="provider_credentials")
+    matricula = models.CharField(max_length=100)
+    vence_el = models.DateField(null=True, blank=True)
+    verificada = models.BooleanField(default=False)
+    documento_url = models.URLField(blank=True)
+
+
+class BaseAuditModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        abstract = True
+
+
+class TenantAwareModel(BaseAuditModel):
+    tenant = models.ForeignKey(Tenant, on_delete=models.PROTECT, related_name="%(class)ss")
+    class Meta:
+        abstract = True
+
+
+class NoTripleRepeatPasswordValidator:
+    """Regla Jupiter: 15 caracteres y ningún carácter repetido tres veces seguido."""
+    def validate(self, password, user=None):
+        if len(password or "") < 15:
+            raise ValidationError("La contraseña debe tener al menos 15 caracteres.")
+        if any(password[i] == password[i + 1] == password[i + 2] for i in range(len(password) - 2)):
+            raise ValidationError("La contraseña no puede contener tres caracteres iguales consecutivos.")
+    def get_help_text(self):
+        return "Mínimo 15 caracteres y sin tres caracteres consecutivos iguales."
 
 DIAS_POR_VENCER = 30
 LIMITE_MENSAJES_CLIENTE = 3
@@ -32,6 +120,7 @@ def validar_anio_fabricacion(valor):
 # Cliente y Perfil
 # ---------------------------------------------------------------------------
 class Cliente(models.Model):
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.PROTECT, related_name="clientes")
     nombre = models.CharField(max_length=150, unique=True)
     contacto = models.CharField(max_length=255, blank=True)
     # Planta/sede que va en el encabezado de la planilla de extintores (V3.0).
@@ -57,6 +146,9 @@ class Perfil(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
     # rol = None  ->  "Público registrado": cuenta sin ningún permiso
     rol = models.CharField(max_length=20, choices=Rol.choices, null=True, blank=True, default=None)
+    backup_email = models.EmailField(blank=True)
+    privacy_mode = models.BooleanField(default=False)
+    detail_view = models.BooleanField(default=False)
     # Multitenancy: el usuario solo ve datos de estos clientes
     clientes = models.ManyToManyField(Cliente, blank=True, related_name="perfiles")
     history = HistoricalRecords()
@@ -82,6 +174,7 @@ def crear_perfil(sender, instance, created, **kwargs):
 # Matafuego
 # ---------------------------------------------------------------------------
 class Matafuego(models.Model):
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.PROTECT, related_name="matafuegos")
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name="matafuegos")
     numero_serie = models.CharField(max_length=60)
     clase = models.CharField(max_length=30, blank=True)
@@ -97,6 +190,7 @@ class Matafuego(models.Model):
     vencimiento_ph = models.DateField(null=True, blank=True)
     token_qr = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     activo = models.BooleanField(default=True)  # baja lógica
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     creado = models.DateTimeField(auto_now_add=True)
     history = HistoricalRecords()
 
@@ -296,6 +390,7 @@ class Control(models.Model):
 # Soporte: tickets y chat
 # ---------------------------------------------------------------------------
 class TicketSoporte(models.Model):
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.PROTECT, related_name="tickets")
     class Estado(models.TextChoices):
         ABIERTO = "ABIERTO", "Abierto"
         CERRADO = "CERRADO", "Cerrado"
@@ -368,6 +463,7 @@ class MensajeChat(models.Model):
 # Auditoría: quién hizo qué, sobre qué dato y cuándo (inmutable)
 # ---------------------------------------------------------------------------
 class Auditoria(models.Model):
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.PROTECT, related_name="audit_logs")
     fecha = models.DateTimeField(default=timezone.now, db_index=True)
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
@@ -436,6 +532,84 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"{self.usuario} · {self.titulo}"
+
+
+# ---------------------------------------------------------------------------
+# Compliance, identidad y recuperación (Jupiter)
+# ---------------------------------------------------------------------------
+class LegalDocument(models.Model):
+    class Tipo(models.TextChoices):
+        PRIVACIDAD = "PRIVACIDAD", "Política de privacidad"
+        TOS = "TOS", "Términos de uso"
+        EULA = "EULA", "Licencia EULA"
+        DPA = "DPA", "Acuerdo de procesamiento de datos"
+    document_type = models.CharField(max_length=16, choices=Tipo.choices)
+    version = models.CharField(max_length=24)
+    content = models.TextField()
+    critical = models.BooleanField(default=False)
+    published_at = models.DateTimeField(default=timezone.now)
+    is_active = models.BooleanField(default=True)
+    content_sha256 = models.CharField(max_length=64, editable=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["document_type", "version"], name="uniq_legal_document_version")]
+        ordering = ["document_type", "-published_at"]
+
+    def save(self, *args, **kwargs):
+        self.content_sha256 = hashlib.sha256(self.content.encode("utf-8")).hexdigest()
+        super().save(*args, **kwargs)
+
+
+class LegalAcceptanceLog(models.Model):
+    user = models.ForeignKey(User, on_delete=models.PROTECT, related_name="legal_acceptances")
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.PROTECT, related_name="legal_acceptances")
+    document = models.ForeignKey(LegalDocument, on_delete=models.PROTECT)
+    document_type = models.CharField(max_length=16)
+    document_version = models.CharField(max_length=24)
+    accepted_at = models.DateTimeField(default=timezone.now)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+    content_sha256 = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "tenant", "document"], name="uniq_legal_acceptance")]
+
+
+class RepentanceRequest(models.Model):
+    tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.SET_NULL, related_name="repentance_requests")
+    email = models.EmailField()
+    reason = models.TextField(blank=True)
+    requested_at = models.DateTimeField(auto_now_add=True)
+    scheduled_deletion_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, default="RECIBIDA")
+
+
+class OTPCode(models.Model):
+    """Nunca guarda el código en claro; sirve para alta, recuperación y correo de respaldo."""
+    PURPOSES = (("VERIFY", "Verificación"), ("RESET", "Recuperación"), ("EMAIL", "Email"), ("BACKUP", "Respaldo"))
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.CASCADE, related_name="otp_codes")
+    email = models.EmailField()
+    purpose = models.CharField(max_length=10, choices=PURPOSES)
+    code_hash = models.CharField(max_length=64)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    @classmethod
+    def issue(cls, *, email, purpose, user=None):
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        row = cls.objects.create(user=user, email=email.lower(), purpose=purpose,
+            code_hash=hashlib.sha256(code.encode()).hexdigest(), expires_at=timezone.now() + timedelta(minutes=10))
+        return row, code
+
+    def verify(self, code):
+        if self.consumed_at or self.attempts >= 5 or timezone.now() > self.expires_at:
+            return False
+        self.attempts += 1
+        ok = secrets.compare_digest(self.code_hash, hashlib.sha256(str(code).encode()).hexdigest())
+        if ok: self.consumed_at = timezone.now()
+        self.save(update_fields=["attempts", "consumed_at"])
+        return ok
 
 
 

@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 /**
  * Tema claro / oscuro centralizado (v3.3).
@@ -30,8 +30,8 @@ function aplicar(valor, animar) {
   const html = document.documentElement;
   if (animar) {
     // Transición suave de colores solo al cambiar a mano; se quita enseguida para no frenar el resto
-    html.classList.add("cambiando-tema");
-    window.setTimeout(() => html.classList.remove("cambiando-tema"), 320);
+    html.classList.add("theme-transitioning");
+    window.setTimeout(() => html.classList.remove("theme-transitioning"), 260);
   }
   html.classList.toggle("dark", valor === "dark");
   html.style.colorScheme = valor;
@@ -68,14 +68,17 @@ export function useTema() {
 /** Botón de la barra superior para alternar claro / oscuro. */
 export default function BotonTema() {
   const { oscuro, alternar } = useTema();
+  const [locked, setLocked] = useState(false);
+  const onToggle = () => { if (locked) return; setLocked(true); alternar(); window.setTimeout(() => setLocked(false), 260); };
   return (
     <button
       type="button"
-      onClick={alternar}
+      onClick={onToggle}
+      disabled={locked}
       aria-pressed={oscuro}
       aria-label={oscuro ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
       title={oscuro ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      className="dci-icon-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors active:scale-95"
+      className="dci-icon-button inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors active:scale-95 disabled:pointer-events-none disabled:opacity-60"
     >
       {oscuro ? (
         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
