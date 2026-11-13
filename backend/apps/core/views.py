@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
@@ -41,6 +41,7 @@ from .models import (
     TenantRole,
 )
 from .otp import OTPService
+from .repentance import enviar_constancia
 from .tenancy import LEGACY_CLIENTS, membership_for, tenant_for_request
 from .permissions import (
     EscrituraAdmin,
@@ -69,6 +70,7 @@ from .serializers import (
     MeSerializer,
     RegistroSerializer,
     RevocarRolSerializer,
+    RepentanceSerializer,
     TicketSerializer,
 )
 
@@ -147,7 +149,7 @@ class LegalDocumentsView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
     def get(self, request):
-        return Response([{"type": d.document_type, "version": d.version, "content": d.content,
+        return Response([{"id": d.id, "type": d.document_type, "version": d.version, "content": d.content,
                           "sha256": d.content_sha256, "critical": d.critical}
                          for d in LegalDocument.objects.filter(is_active=True)])
 
@@ -201,12 +203,24 @@ class AccountSecurityView(APIView):
 
 class RepentanceView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "repentance"
+
     def post(self, request):
-        email = request.data.get("email", "").strip().lower()
-        if not email: raise ValidationError({"email": "Indicá un email."})
-        item = RepentanceRequest.objects.create(email=email, reason=request.data.get("reason", "")[:4000])
-        return Response({"id": item.id, "detail": "Tu solicitud fue recibida."}, status=201)
+        serializer = RepentanceSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        tenant = tenant_for_request(request) if request.user.is_authenticated else None
+        with transaction.atomic():
+            item = RepentanceRequest.objects.create(
+                **serializer.validated_data, tenant=tenant,
+                scheduled_deletion_at=timezone.now() + timedelta(days=10),
+            )
+            auditar(request, "ARREPENTIMIENTO", "RepentanceRequest", item.pk, item.codigo)
+            transaction.on_commit(lambda: enviar_constancia(item), robust=True)
+        return Response({
+            "id": item.pk, "codigo": item.codigo, "requested_at": item.requested_at,
+            "detail": "Tu solicitud fue recibida.",
+        }, status=status.HTTP_201_CREATED)
 
 
 class TrashView(APIView):

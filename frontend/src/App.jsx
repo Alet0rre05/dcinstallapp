@@ -16,6 +16,7 @@ import Tutoria from "./pages/Tutoria.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Reportes from "./pages/Reportes.jsx";
 import Escanear from "./pages/Escanear.jsx";
+import Arrepentimiento from "./pages/Arrepentimiento.jsx";
 import Legales from "./pages/Legales.jsx";
 import Papelera from "./pages/Papelera.jsx";
 import Layout from "./lib/Layout.jsx";
@@ -45,6 +46,7 @@ function Rutas() {
         <Route path="/tutoria" element={<Tutoria />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registro" element={<Registro />} />
+        <Route path="/arrepentimiento" element={<Arrepentimiento />} />
         <Route path="/legales" element={<Legales />} />
         <Route path="/" element={<Privada><Matafuegos /></Privada>} />
         <Route path="/importar" element={<Privada><SoloStaff><Importar /></SoloStaff></Privada>} />

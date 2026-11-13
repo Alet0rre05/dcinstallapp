@@ -125,6 +125,8 @@ CONTROL_BLOQUEO_MESES = max(1, int(os.environ.get("CONTROL_BLOQUEO_MESES", "6"))
 ESCALADA_CONTROL_DIAS = max(1, int(os.environ.get("ESCALADA_CONTROL_DIAS", "30")))
 USE_I18N = True
 USE_TZ = True
+SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+EMAIL_TIMEOUT = 8
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
@@ -181,6 +183,7 @@ REST_FRAMEWORK = {
     # Render pone un proxy delante: la IP real viene en X-Forwarded-For
     "NUM_PROXIES": int(os.environ.get("NUM_PROXIES", "1")),
     "DEFAULT_THROTTLE_RATES": {
+        "repentance": "30/hour",
         "register": "60/min",  # anti-spam de registros por IP
         "qr_public": "120/min",  # escaneo público de QR por IP
     },

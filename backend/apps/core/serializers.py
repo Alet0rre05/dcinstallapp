@@ -27,6 +27,13 @@ User = get_user_model()
 # ---------------------------------------------------------------------------
 # Usuarios
 # ---------------------------------------------------------------------------
+class RepentanceSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    nombre = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    empresa = serializers.CharField(max_length=160, required=False, allow_blank=True)
+    reason = serializers.CharField(max_length=4000, required=False, allow_blank=True)
+
+
 class RegistroSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
@@ -67,12 +74,16 @@ class ClienteSerializer(serializers.ModelSerializer):
 
 class MeSerializer(serializers.ModelSerializer):
     tenant_slug = serializers.SerializerMethodField()
+    global_access = serializers.SerializerMethodField()
     rol = serializers.SerializerMethodField()
     clientes = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "username", "email", "first_name", "rol", "clientes", "tenant_slug"]
+        fields = ["id", "username", "email", "first_name", "rol", "clientes", "tenant_slug", "global_access"]
+
+    def get_global_access(self, obj):
+        return obj.is_superuser and membership_for(obj) is None
 
     def get_tenant_slug(self, obj):
         membership = membership_for(obj)

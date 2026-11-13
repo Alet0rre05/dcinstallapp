@@ -577,6 +577,14 @@ class LegalAcceptanceLog(models.Model):
 
 
 class RepentanceRequest(models.Model):
+    nombre = models.CharField(max_length=150, blank=True)
+    empresa = models.CharField(max_length=160, blank=True)
+
+    @property
+    def codigo(self):
+        fecha = timezone.localtime(self.requested_at).date()
+        return f"ARP-{fecha:%Y%m%d}-{self.pk:06d}"
+
     tenant = models.ForeignKey(Tenant, null=True, blank=True, on_delete=models.SET_NULL, related_name="repentance_requests")
     email = models.EmailField()
     reason = models.TextField(blank=True)

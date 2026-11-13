@@ -114,6 +114,8 @@ export default function Layout({ children }) {
           <div className="dci-mobile-brand flex min-h-7 items-center gap-2 border-t border-white/[.06] px-4 py-1 md:hidden"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-cyan-400"/><span className="text-[9px] font-semibold uppercase tracking-[.14em] text-cyan-200">DCINSTALL - PANDORA</span></div>
         </header>
 
+        {!user && location.pathname === "/login" && <Link className="link px-4 py-2 text-center text-sm" to="/arrepentimiento">Botón de arrepentimiento</Link>}
+
         {abierto && <div className="dci-drawer-backdrop fixed inset-0 z-40 print:hidden" aria-hidden="true" onClick={cerrar} />}
         <aside ref={panelRef} id="dci-drawer" role="dialog" aria-modal="true" aria-label="Navegación principal" aria-hidden={!abierto} className={`dci-drawer fixed inset-y-0 left-0 z-50 flex w-[min(88vw,340px)] flex-col print:hidden ${abierto ? "dci-drawer-open" : ""}`} inert={!abierto ? true : undefined}>
           <div className="dci-drawer-heading flex items-center justify-between border-b border-white/10 px-5 py-4"><div className="min-w-0"><strong className="block text-sm tracking-[.14em] text-white">DCINSTALL</strong><span className="mt-1 block text-[10px] font-semibold uppercase tracking-[.16em] text-cyan-300">Pandora · Navegación</span></div><button type="button" onClick={cerrar} aria-label="Cerrar menú" className="dci-menu-button">✕</button></div>
@@ -122,7 +124,7 @@ export default function Layout({ children }) {
         </aside>
 
         <main className={location.pathname === "/login" ? "w-full min-w-0 flex-1" : "dci-main-content mx-auto w-full max-w-7xl min-w-0 flex-1 px-3 py-4 sm:px-5 sm:py-6 lg:px-8"}>{tieneRol && <OfflineActions />}{children}</main>
-        <footer className="dci-footer print:hidden"><div><span>© {new Date().getFullYear()} DC INSTALL · </span><a href="https://ajrdata.com.ar" target="_blank" rel="noopener noreferrer">Hecho por AJR DATA</a></div><nav aria-label="Legal"><Link to="/legales">Privacidad</Link><Link to="/legales">Términos de uso</Link><Link to="/legales">Licencia EULA</Link><a href="mailto:legal@ajrdata.com.ar?subject=Botón%20de%20arrepentimiento">Botón de arrepentimiento</a></nav></footer>
+        <footer className="dci-footer print:hidden"><div><span>© {new Date().getFullYear()} DC INSTALL · </span><a href="https://ajrdata.com.ar" target="_blank" rel="noopener noreferrer">Hecho por AJR DATA</a></div><nav aria-label="Legal"><Link to="/legales?doc=PRIVACIDAD">Privacidad</Link><Link to="/legales?doc=TOS">Términos de uso</Link><Link to="/legales?doc=EULA">Licencia EULA</Link><Link to="/arrepentimiento">Botón de arrepentimiento</Link></nav></footer>
       </div>
     </MotionConfig>
   );

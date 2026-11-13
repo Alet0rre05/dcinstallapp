@@ -5,6 +5,7 @@ from simple_history.admin import SimpleHistoryAdmin
 
 from .audit import MATAFUEGO_CAMPOS, auditar, snapshot
 from .models import Auditoria, Cliente, Control, Matafuego, MensajeChat, Notificacion, Perfil, TicketSoporte
+from .models import LegalDocument, LegalAcceptanceLog, RepentanceRequest
 from .permissions import puede_borrar_en_admin, puede_cargar_en_admin
 
 
@@ -204,3 +205,51 @@ class NotificacionAdmin(admin.ModelAdmin):
     list_display = ("creada", "usuario", "tipo", "titulo", "leida")
     list_filter = ("tipo", "leida")
     search_fields = ("usuario__username", "titulo")
+
+
+@admin.register(LegalDocument)
+class LegalDocumentAdmin(admin.ModelAdmin):
+    list_display = ("document_type", "version", "is_active", "published_at")
+    list_filter = ("document_type", "is_active")
+    readonly_fields = ("content_sha256",)
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and LegalAcceptanceLog.objects.filter(document=obj).exists():
+            return (*self.readonly_fields, "document_type", "version", "content")
+        return self.readonly_fields
+
+
+@admin.register(LegalAcceptanceLog)
+class LegalAcceptanceLogAdmin(admin.ModelAdmin):
+    list_display = ("accepted_at", "user", "tenant", "document_type", "document_version")
+    list_filter = ("document_type", "accepted_at")
+    search_fields = ("user__email", "tenant__slug")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RepentanceRequest)
+class RepentanceRequestAdmin(admin.ModelAdmin):
+    list_display = ("codigo", "email", "empresa", "requested_at", "status")
+    list_filter = ("status", "requested_at")
+    readonly_fields = ("codigo", "requested_at", "nombre", "empresa", "email", "reason", "tenant")
+    search_fields = ("email", "nombre", "empresa")
+
+    def has_add_permission(self, request):
+        return False
+
+    def get_search_results(self, request, queryset, search_term):
+        if search_term.upper().startswith("ARP-"):
+            parts = search_term.strip().upper().split("-")
+            if len(parts) == 3 and parts[2].isascii() and parts[2].isdigit() and len(parts[2]) <= 18:
+                item = queryset.filter(pk=int(parts[2])).first()
+                if item and item.codigo == search_term.strip().upper():
+                    return queryset.filter(pk=item.pk), False
+        return super().get_search_results(request, queryset, search_term)
